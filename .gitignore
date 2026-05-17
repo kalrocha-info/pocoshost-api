@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+.env.production
+*.log
+npm-debug.log*
+.DS_Store
+coverage/
+dist/
+*.sqlite
+*.db
+desktop.ini

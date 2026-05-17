@@ -1,0 +1,23 @@
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import authRoutes from './routes/auth.js';
+import propertiesRoutes from './routes/properties.js';
+import reservationsRoutes from './routes/reservations.js';
+import paymentsRoutes from './routes/payments.js';
+import reviewsRoutes from './routes/reviews.js';
+import favoritesRoutes from './routes/favorites.js';
+
+export function createApp() {
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+  app.use('/api/auth', authRoutes);
+  app.use('/api/properties', propertiesRoutes);
+  app.use('/api/reservations', reservationsRoutes);
+  app.use('/api/payments', paymentsRoutes);
+  app.use('/api/reviews', reviewsRoutes);
+  app.use('/api/favorites', favoritesRoutes);
+  app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
+  return app;
+}
