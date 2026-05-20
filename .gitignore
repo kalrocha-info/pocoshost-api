@@ -1,13 +1,62 @@
+# Dependências
 node_modules/
+
+# ============================================
+# ARQUIVOS COM CREDENCIAIS - NUNCA COMMITAR!
+# ============================================
 .env
+.env.*
+!.env.example
+!.env.production.example
+!.env.test
+
+# Arquivos específicos de credenciais
 .env.local
 .env.production
+.env.neon
+.env.staging
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ============================================
+# Logs e Debug
+# ============================================
 *.log
 npm-debug.log*
-.DS_Store
-coverage/
+yarn-debug.log*
+yarn-error.log*
+server.log
+
+# ============================================
+# Build e Cache
+# ============================================
 dist/
+build/
+coverage/
+.cache/
+.tmp/
+
+# ============================================
+# Banco de Dados Local
+# ============================================
 *.sqlite
+*.sqlite3
 *.db
+
+# ============================================
+# Sistema Operacional
+# ============================================
+.DS_Store
+Thumbs.db
 desktop.ini
-.env.neon
+
+# ============================================
+# IDE
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
