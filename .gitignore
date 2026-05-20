@@ -10,3 +10,4 @@ dist/
 *.sqlite
 *.db
 desktop.ini
+.env.neon
