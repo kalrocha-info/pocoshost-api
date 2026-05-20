@@ -7,6 +7,8 @@ import reservationsRoutes from './routes/reservations.js';
 import paymentsRoutes from './routes/payments.js';
 import reviewsRoutes from './routes/reviews.js';
 import favoritesRoutes from './routes/favorites.js';
+import categoriesRoutes from './routes/categories.js';
+import adminRoutes from './routes/admin.js';
 
 export function createApp() {
   const app = express();
@@ -18,6 +20,8 @@ export function createApp() {
   app.use('/api/payments', paymentsRoutes);
   app.use('/api/reviews', reviewsRoutes);
   app.use('/api/favorites', favoritesRoutes);
+  app.use('/api/categories', categoriesRoutes);
+  app.use('/api/admin', adminRoutes);
   app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
   return app;
 }

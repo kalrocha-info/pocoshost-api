@@ -15,6 +15,11 @@ import {
   updateReservationAdmin,
   listAllPayments,
   getPaymentStats,
+  listUsers,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -55,5 +60,14 @@ router.put('/reservations/:id', updateReservationAdmin);
 // ============================================
 router.get('/payments', listAllPayments);
 router.get('/payments/stats', getPaymentStats);
+
+// ============================================
+// Users (Usuários)
+// ============================================
+router.get('/users', listUsers);
+router.get('/users/:id', getUser);
+router.post('/users', createUser);
+router.put('/users/:id', updateUser);
+router.delete('/users/:id', deleteUser);
 
 export default router;

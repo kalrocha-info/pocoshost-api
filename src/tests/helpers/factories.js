@@ -10,6 +10,9 @@ export async function createUser(overrides = {}) {
     full_name: overrides.full_name ?? 'Teste User',
     email: overrides.email ?? `user_${randomUUID()}@test.com`,
     password: overrides.password ?? 'senha123',
+    role: overrides.role,
+    document_type: overrides.role === 'host' ? (overrides.document_type ?? 'cpf') : overrides.document_type,
+    document_number: overrides.role === 'host' ? (overrides.document_number ?? '12345678901') : overrides.document_number,
   };
   const res = await request(app).post('/api/auth/register').send(data);
   return { token: res.body.token, user: res.body.user, password: data.password };
@@ -53,3 +56,4 @@ export async function createReservation(token, propertyId, overrides = {}) {
     .send(data);
   return res.body;
 }
+
