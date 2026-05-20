@@ -88,6 +88,17 @@ export const schemas = {
   payment: z.object({
     reservation_id: z.string().uuid('reservation_id deve ser um UUID válido'),
     card_last4: z.string().length(4).optional().nullable(),
+    card_number: z.string().optional(),
+    card_holder_name: z.string().optional(),
+    card_expiry: z.string().optional(),
+    card_cvv: z.string().optional(),
+  }).refine((data) => {
+    const hasCardData = data.card_number || data.card_holder_name || data.card_expiry || data.card_cvv;
+    if (!hasCardData) return true;
+    return Boolean(data.card_number && data.card_holder_name && data.card_expiry && data.card_cvv);
+  }, {
+    message: 'Para pagar com cartão, é necessário informar número, nome, validade e CVV.',
+    path: ['card_number'],
   }),
 
   review: z.object({

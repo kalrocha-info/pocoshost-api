@@ -12,6 +12,7 @@ import paymentsRoutes from './routes/payments.js';
 import reviewsRoutes from './routes/reviews.js';
 import favoritesRoutes from './routes/favorites.js';
 import categoriesRoutes from './routes/categories.js';
+import webhooksRoutes from './routes/webhooks.js';
 
 const app = express();
 
@@ -114,6 +115,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/categories', categoriesRoutes);
+app.use('/api/webhooks', webhooksRoutes);
 app.get('/api/health', (_, res) => res.json({ status: 'ok', project: 'PoçosHost API' }));
 
 // Handler global de erros — nunca deixa o servidor crashar

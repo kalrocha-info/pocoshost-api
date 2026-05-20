@@ -2,9 +2,15 @@ import { pool } from '../db/pool.js';
 import { sendServerError } from '../utils/http.js';
 
 export async function list(req, res) {
-  const { category, city, guests, sort = '-created_date' } = req.query;
+  const { category, city, guests, sort = '-created_date', owner } = req.query;
   const conditions = ['p.is_active = true'];
   const params = [];
+
+  // Filtro para listar apenas imóveis do anfitrião autenticado
+  if (owner === 'me' && req.user?.id) {
+    params.push(req.user.id);
+    conditions.push(`p.created_by = $${params.length}`);
+  }
 
   if (category) { params.push(category); conditions.push(`p.category = $${params.length}`); }
   if (city) { params.push(`%${city}%`); conditions.push(`p.city ILIKE $${params.length}`); }
