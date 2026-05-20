@@ -129,7 +129,7 @@ app.use((err, req, res, next) => {
   return sendServerError(res, err);
 });
 
-const PORT = process.env.PORT ?? 3001;
-app.listen(PORT, () => console.log(`🚀 PoçosHost API rodando em http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 PoçosHost API rodando na porta ${PORT}`));
 
 export default app;
