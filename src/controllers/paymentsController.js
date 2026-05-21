@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { sendServerError } from '../utils/http.js';
-import { findOrCreateCustomer, createCreditCardPayment, mapAsaasStatus } from '../services/asaasService.js';
+import { findOrCreateCustomer, createCreditCardPayment, createPixPayment, mapAsaasStatus } from '../services/asaasService.js';
 
 export async function list(req, res) {
   const { role } = req.query;
@@ -23,6 +23,7 @@ function normalizeCardNumber(value) {
 export async function create(req, res) {
   const {
     reservation_id,
+    billing_type = 'CREDIT_CARD',
     card_last4,
     card_number,
     card_holder_name,
@@ -46,20 +47,27 @@ export async function create(req, res) {
       return res.status(409).json({ error: 'Esta reserva já possui pagamento registrado.' });
     }
 
-    let paymentStatus = 'paid';
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const guest = userResult.rows[0];
+    const customer = await findOrCreateCustomer({
+      name: guest.full_name,
+      email: guest.email,
+      cpf: guest.document_number,
+      phone: guest.phone,
+    });
+
+    let paymentStatus = 'pending';
     let gatewayStatus = null;
     let gatewayPaymentId = null;
+    let pixQrCode = null;
+    let pixPayload = null;
 
-    const hasCardData = card_number || card_holder_name || card_expiry || card_cvv;
-    if (hasCardData) {
-      const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
-      const guest = userResult.rows[0];
-      const customer = await findOrCreateCustomer({
-        name: guest.full_name,
-        email: guest.email,
-        cpf: guest.document_number,
-        phone: guest.phone,
-      });
+    if (billing_type === 'CREDIT_CARD') {
+      if (!card_number || !card_holder_name || !card_expiry || !card_cvv) {
+        return res.status(400).json({
+          error: 'Dados do cartão de crédito incompletos. Informe número, titular, validade e CVV.'
+        });
+      }
 
       const asaasPayment = await createCreditCardPayment({
         customer,
@@ -81,6 +89,25 @@ export async function create(req, res) {
       gatewayStatus = asaasPayment.status;
       gatewayPaymentId = asaasPayment.id;
       paymentStatus = mapAsaasStatus(asaasPayment.status);
+    } else if (billing_type === 'PIX') {
+      const asaasPix = await createPixPayment({
+        customer,
+        reservation: {
+          id: r.id,
+          totalPrice: Number(r.total_price),
+          propertyName: r.property_title,
+          description: r.property_title,
+        },
+        hostWalletId: process.env.ASAAS_WALLET_POCOSHOST,
+      });
+
+      gatewayStatus = asaasPix.status;
+      gatewayPaymentId = asaasPix.id;
+      paymentStatus = mapAsaasStatus(asaasPix.status);
+      pixQrCode = asaasPix.pix.encodedImage;
+      pixPayload = asaasPix.pix.payload;
+    } else {
+      return res.status(400).json({ error: 'Método de pagamento não suportado.' });
     }
 
     const insertResult = await pool.query(
@@ -96,7 +123,7 @@ export async function create(req, res) {
         r.total_price,
         r.platform_fee,
         r.host_net,
-        card_last4 ?? null,
+        billing_type === 'CREDIT_CARD' ? (card_last4 ?? null) : null,
         paymentStatus,
       ]
     );
@@ -112,6 +139,8 @@ export async function create(req, res) {
       ...insertResult.rows[0],
       gateway_status: gatewayStatus,
       gateway_payment_id: gatewayPaymentId,
+      gateway_pix_qrcode: pixQrCode,
+      gateway_pix_payload: pixPayload,
     });
   } catch (err) {
     sendServerError(res, err);

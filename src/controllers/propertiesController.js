@@ -1,5 +1,5 @@
 import { pool } from '../db/pool.js';
-import { sendServerError } from '../utils/http.js';
+import { sendServerError, assertUUID } from '../utils/http.js';
 
 export async function list(req, res) {
   const { category, city, guests, sort = '-created_date', owner } = req.query;
@@ -34,6 +34,7 @@ export async function list(req, res) {
 }
 
 export async function getById(req, res) {
+  if (!assertUUID(res, req.params.id)) return;
   try {
     const result = await pool.query('SELECT * FROM properties WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Imóvel não encontrado.' });
@@ -73,6 +74,7 @@ export async function create(req, res) {
 }
 
 export async function update(req, res) {
+  if (!assertUUID(res, req.params.id)) return;
   const fields = ['title','description','city','state','address','latitude','longitude',
     'category','tags','price_per_night','max_guests','bedrooms','bathrooms',
     'photos','cover_photo','rules','host_name','is_active'];
@@ -105,6 +107,7 @@ export async function update(req, res) {
 }
 
 export async function remove(req, res) {
+  if (!assertUUID(res, req.params.id)) return;
   try {
     const result = await pool.query(
       'DELETE FROM properties WHERE id = $1 AND created_by = $2 RETURNING id',
