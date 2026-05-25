@@ -17,6 +17,24 @@ async function seed() {
     );
     const adminId = userRes.rows[0].id;
 
+    // Utilizadores E2E (Playwright smoke.spec.js)
+    const guestHash = await bcrypt.hash('123456', 10);
+    await client.query(
+      `INSERT INTO users (full_name, email, password_hash, role)
+       VALUES ($1, $2, $3, 'guest')
+       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
+      ['Hóspede Demo', 'guest@pocoshost.com', guestHash]
+    );
+    const hostHash = await bcrypt.hash('123456', 10);
+    const hostRes = await client.query(
+      `INSERT INTO users (full_name, email, password_hash, role, document_type, document_number)
+       VALUES ($1, $2, $3, 'host', 'cpf', '52998224725')
+       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+       RETURNING id`,
+      ['Anfitrião Demo', 'host@pocoshost.com', hostHash]
+    );
+    const hostId = hostRes.rows[0]?.id ?? adminId;
+
     // Categorias base
     const categories = [
       { slug: 'chale', name: 'Chalé' },
@@ -122,7 +140,9 @@ async function seed() {
 
     await client.query('COMMIT');
     console.log('✅ Seed executado com sucesso.');
-    console.log('   Login demo: admin@pocoshost.com.br / demo1234');
+    console.log('   Admin: admin@pocoshost.com.br / demo1234');
+    console.log('   Hóspede (E2E): guest@pocoshost.com / 123456');
+    console.log('   Anfitrião (E2E): host@pocoshost.com / 123456');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Erro no seed:', err.message);

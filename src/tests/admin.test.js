@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../testApp.js';
 import { pool } from '../db/pool.js';
 import { createUser, createProperty, createReservation } from './helpers/factories.js';
+import { creditCardPaymentPayload } from './helpers/paymentPayload.js';
 
 const app = createApp();
 
@@ -113,7 +114,7 @@ describe('ADMIN — /api/admin', () => {
     await request(app)
       .post('/api/payments')
       .set('Authorization', `Bearer ${guest.token}`)
-      .send({ reservation_id: reservation.id, card_last4: '4242' });
+      .send(creditCardPaymentPayload(reservation.id, { card_last4: '4242' }));
 
     const reservationsRes = await request(app)
       .get('/api/admin/reservations')

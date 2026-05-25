@@ -4,7 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./src/tests/helpers/setup.js'],
+    setupFiles: [
+      './src/tests/helpers/mockAsaas.js',
+      './src/tests/helpers/setup.js',
+    ],
     testTimeout: 15000,
     hookTimeout: 15000,
     fileParallelism: false,
