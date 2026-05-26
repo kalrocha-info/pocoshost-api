@@ -15,9 +15,9 @@ router.use((err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'O arquivo excede o limite de 5MB.' });
     }
-    return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+    return res.status(400).json({ error: 'Erro no upload da imagem.' });
   } else if (err) {
-    return res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: 'Formato de arquivo não suportado. Apenas JPG, PNG e WEBP são aceitos.' });
   }
   next();
 });

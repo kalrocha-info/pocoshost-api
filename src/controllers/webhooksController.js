@@ -1,5 +1,9 @@
 import { pool } from '../db/pool.js';
 import { sendServerError } from '../utils/http.js';
+import {
+  sendReservationConfirmationToGuest,
+  sendReservationConfirmationToHost,
+} from '../services/emailService.js';
 
 export async function asaas(req, res) {
   try {
@@ -36,6 +40,19 @@ export async function asaas(req, res) {
         'UPDATE reservations SET status = $1, updated_date = NOW() WHERE id = $2',
         [newStatus, reservationId]
       );
+
+      if (newStatus === 'confirmed') {
+        const updatedReservation = { ...reservation, status: 'confirmed' };
+
+        // Disparar e-mails de confirmação de forma assíncrona (não-bloqueante)
+        sendReservationConfirmationToGuest(updatedReservation).catch((err) => {
+          console.error('[Webhook Asaas] Erro ao enviar e-mail ao hóspede:', err);
+        });
+
+        sendReservationConfirmationToHost(updatedReservation).catch((err) => {
+          console.error('[Webhook Asaas] Erro ao enviar e-mail ao anfitrião:', err);
+        });
+      }
     }
 
     return res.status(200).json({ success: true });
