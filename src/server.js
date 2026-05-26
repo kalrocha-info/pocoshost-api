@@ -56,6 +56,9 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
+// Health check publico antes do CORS para suportar monitores, curl e painel da Hostinger.
+app.get('/api/health', (_, res) => res.json({ status: 'ok', project: 'PoçosHost API' }));
+
 // ============================================
 // CORS - Cross-Origin Resource Sharing
 // ============================================
@@ -120,7 +123,6 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
-app.get('/api/health', (_, res) => res.json({ status: 'ok', project: 'PoçosHost API' }));
 
 // Handler global de erros — nunca deixa o servidor crashar
 app.use((err, req, res, next) => {
