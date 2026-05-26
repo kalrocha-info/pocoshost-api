@@ -18,6 +18,9 @@ import uploadRoutes from './routes/upload.js';
 
 const app = express();
 
+// A Hostinger opera atras de proxy reverso; necessario para rate limit e IP real.
+app.set('trust proxy', 1);
+
 // ============================================
 // SEGURANÇA - Headers e Proteções
 // ============================================
@@ -56,7 +59,8 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
-// Health check publico antes do CORS para suportar monitores, curl e painel da Hostinger.
+// Health checks publicos antes do CORS para suportar monitores, curl e painel da Hostinger.
+app.get('/', (_, res) => res.json({ status: 'ok', project: 'PoçosHost API' }));
 app.get('/api/health', (_, res) => res.json({ status: 'ok', project: 'PoçosHost API' }));
 
 // ============================================
@@ -66,18 +70,18 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http:/
 
 app.use(cors({ 
   origin: (origin, callback) => {
-    // Permitir requisições sem origin (como curl, Postman) apenas em desenvolvimento
+    // Requisicoes server-to-server, health checks, curl e painel da Hostinger nao enviam Origin.
+    // CORS protege browsers; bloquear ausencia de Origin gera falsos 500 em producao.
     if (!origin) {
-      if (process.env.NODE_ENV === 'production') {
-        return callback(new Error('Origin header obrigatório'));
-      }
       return callback(null, true);
     }
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     console.warn(`CORS bloqueado para origin: ${origin}`);
-    return callback(new Error('Não permitido pelo CORS'));
+    const error = new Error('Não permitido pelo CORS');
+    error.status = 403;
+    return callback(error);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
