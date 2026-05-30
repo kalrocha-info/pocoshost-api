@@ -6,6 +6,7 @@ export default defineConfig({
     environment: 'node',
     setupFiles: [
       './src/tests/helpers/mockAsaas.js',
+      './src/tests/helpers/mockEmail.js',
       './src/tests/helpers/setup.js',
     ],
     testTimeout: 15000,

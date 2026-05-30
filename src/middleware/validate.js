@@ -31,6 +31,10 @@ export const schemas = {
     password: z.string().min(1, 'Password obrigatória'),
   }),
 
+  resendVerification: z.object({
+    email: z.string().email('Email inválido'),
+  }),
+
   property: z.object({
     title: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
     city: z.string().min(2, 'Cidade obrigatória'),

@@ -12,10 +12,10 @@ async function createAdmin(overrides = {}) {
   const password = overrides.password ?? 'senha123';
   const passwordHash = await bcrypt.hash(password, 10);
   const result = await pool.query(
-    `INSERT INTO users (full_name, email, password_hash, role)
-     VALUES ($1, $2, $3, 'admin')
-     RETURNING id, email, full_name, role`,
-    [overrides.full_name ?? 'Admin Teste', overrides.email ?? `admin_${Date.now()}@test.com`, passwordHash]
+    `INSERT INTO users (full_name, email, password_hash, role, email_verified, email_verified_at)
+     VALUES ($1, $2, $3, 'admin', TRUE, NOW())
+     RETURNING id, email, full_name, role, email_verified`,
+    [overrides.full_name ?? 'Admin Teste', overrides.email ?? `admin_${Date.now()}@example.test`, passwordHash]
   );
   const user = result.rows[0];
   const token = jwt.sign(
@@ -52,7 +52,7 @@ describe('ADMIN — /api/admin', () => {
 
   it('lista usuarios sem expor password_hash nem documento completo', async () => {
     const admin = await createAdmin();
-    await createUser({ email: 'cliente-admin-list@test.com' });
+    await createUser({ email: 'cliente-admin-list@example.test' });
 
     const res = await request(app)
       .get('/api/admin/users')
@@ -71,7 +71,7 @@ describe('ADMIN — /api/admin', () => {
       .set('Authorization', `Bearer ${admin.token}`)
       .send({
         full_name: 'Novo Admin',
-        email: 'novo-admin@test.com',
+        email: 'novo-admin@example.test',
         password: 'senha123',
         role: 'admin',
       });
@@ -91,7 +91,7 @@ describe('ADMIN — /api/admin', () => {
 
   it('lista imoveis usando created_by/is_active do schema real', async () => {
     const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-admin-prop@test.com' });
+    const host = await createUser({ role: 'host', email: 'host-admin-prop@example.test' });
     await createProperty(host.token, { title: 'Imovel Admin Schema' });
 
     const res = await request(app)
@@ -106,8 +106,8 @@ describe('ADMIN — /api/admin', () => {
 
   it('lista reservas e pagamentos com aliases esperados pelo painel', async () => {
     const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-admin-flow@test.com' });
-    const guest = await createUser({ email: 'guest-admin-flow@test.com' });
+    const host = await createUser({ role: 'host', email: 'host-admin-flow@example.test' });
+    const guest = await createUser({ email: 'guest-admin-flow@example.test' });
     const property = await createProperty(host.token, { title: 'Casa Fluxo Admin', price_per_night: 200 });
     const reservation = await createReservation(guest.token, property.id);
 

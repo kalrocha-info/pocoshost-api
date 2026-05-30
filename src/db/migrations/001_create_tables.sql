@@ -110,3 +110,32 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_date TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Campos de conciliação com gateway de pagamento (Asaas)
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_type VARCHAR(50);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_payment_id VARCHAR(120);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_status VARCHAR(80);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_payment_id_idx
+  ON payments(gateway_payment_id)
+  WHERE gateway_payment_id IS NOT NULL;
+
+-- Campos LGPD para anonimização de contas
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_anonymized BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMPTZ;
+
+-- Campos de verificação de e-mail
+-- Contas existentes antes desta migration são preservadas como verificadas;
+-- novos cadastros passam a nascer não verificados pelo default abaixo.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+UPDATE users
+   SET email_verified = TRUE,
+       email_verified_at = COALESCE(email_verified_at, created_date, NOW())
+ WHERE email_verified IS NULL;
+ALTER TABLE users ALTER COLUMN email_verified SET DEFAULT FALSE;
+ALTER TABLE users ALTER COLUMN email_verified SET NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token_hash VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS users_email_verification_token_hash_idx
+  ON users(email_verification_token_hash)
+  WHERE email_verification_token_hash IS NOT NULL;

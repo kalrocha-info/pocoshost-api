@@ -5,6 +5,14 @@ import {
   sendReservationConfirmationToHost,
 } from '../services/emailService.js';
 
+function mapWebhookPaymentStatus(status) {
+  const normalized = String(status).toUpperCase();
+  if (['CONFIRMED', 'RECEIVED'].includes(normalized)) return 'paid';
+  if (['CANCELLED', 'REFUNDED', 'FAILED'].includes(normalized)) return 'refunded';
+  if (['PENDING', 'IN_ANALYSIS', 'DRAFT'].includes(normalized)) return 'pending';
+  return null;
+}
+
 export async function asaas(req, res) {
   try {
     const token = req.headers['asaas-access-token'] || req.headers['x-asaas-access-token'];
@@ -34,6 +42,18 @@ export async function asaas(req, res) {
       : ['CANCELLED', 'REFUNDED', 'FAILED'].includes(payment.status)
       ? 'cancelled'
       : null;
+    const paymentStatus = mapWebhookPaymentStatus(payment.status);
+
+    await pool.query(
+      `UPDATE payments
+       SET status = COALESCE($1, status),
+           gateway_payment_id = COALESCE($2, gateway_payment_id),
+           gateway_status = COALESCE($3, gateway_status),
+           billing_type = COALESCE($4, billing_type),
+           updated_date = NOW()
+       WHERE reservation_id = $5`,
+      [paymentStatus, payment.id ?? null, payment.status ?? null, payment.billingType ?? null, reservationId]
+    );
 
     if (newStatus && reservation.status !== newStatus) {
       await pool.query(

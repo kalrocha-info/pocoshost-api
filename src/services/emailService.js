@@ -238,3 +238,32 @@ Equipe PoçosHost
 
   return sendEmail({ to: reservation.host_email, subject, html, text });
 }
+
+export async function sendEmailVerification(user, token) {
+  const siteUrl = (process.env.FRONTEND_URL || process.env.SITE_URL || 'https://pocoshost.com').replace(/\/$/, '');
+  const verificationUrl = `${siteUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  const subject = 'Confirme seu e-mail para ativar sua conta PoçosHost';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #222;">
+      <h1 style="color: #111;">PoçosHost</h1>
+      <p>Olá, ${user.full_name}.</p>
+      <p>Recebemos seu cadastro na PoçosHost. Para ativar sua conta, confirme seu e-mail pelo botão abaixo.</p>
+      <p style="margin: 28px 0;">
+        <a href="${verificationUrl}" style="background: #111; color: #fff; padding: 12px 18px; text-decoration: none; border-radius: 6px; display: inline-block;">
+          Confirmar e-mail
+        </a>
+      </p>
+      <p>Se o botão não funcionar, copie e cole este link no navegador:</p>
+      <p style="word-break: break-all; color: #555;">${verificationUrl}</p>
+      <p>Se você não criou uma conta, ignore este e-mail.</p>
+    </div>
+  `;
+  const text = `Olá, ${user.full_name}.
+
+Recebemos seu cadastro na PoçosHost. Confirme seu e-mail acessando:
+${verificationUrl}
+
+Se você não criou uma conta, ignore este e-mail.`;
+
+  return sendEmail({ to: user.email, subject, html, text });
+}

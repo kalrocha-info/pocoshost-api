@@ -70,27 +70,37 @@ export async function create(req, res) {
   if (!property_id || !check_in || !check_out || !guests)
     return res.status(400).json({ error: 'property_id, check_in, check_out e guests são obrigatórios.' });
 
+  const client = await pool.connect();
   try {
-    // Verificar conflito de datas
-    const conflict = await pool.query(
+    await client.query('BEGIN');
+
+    // 1. Lock da linha do imóvel para serializar as tentativas de reserva concorrentes
+    const prop = await client.query('SELECT * FROM properties WHERE id = $1 FOR UPDATE', [property_id]);
+    if (!prop.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Imóvel não encontrado.' });
+    }
+
+    const property = prop.rows[0];
+
+    // 2. Verificar conflito de datas na reserva
+    const conflict = await client.query(
       `SELECT id FROM reservations
        WHERE property_id = $1 AND status IN ('pending','confirmed')
        AND check_in < $3 AND check_out > $2`,
       [property_id, check_in, check_out]
     );
-    if (conflict.rows.length > 0)
+    if (conflict.rows.length > 0) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Imóvel indisponível para as datas selecionadas.' });
+    }
 
-    const prop = await pool.query('SELECT * FROM properties WHERE id = $1', [property_id]);
-    if (!prop.rows[0]) return res.status(404).json({ error: 'Imóvel não encontrado.' });
-
-    const property = prop.rows[0];
     const nights = Math.ceil((new Date(check_out) - new Date(check_in)) / 86400000);
     const total_price = nights * Number(property.price_per_night);
     const platform_fee = +(total_price * PLATFORM_FEE_RATE).toFixed(2);
     const host_net = +(total_price - platform_fee).toFixed(2);
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO reservations
          (property_id, property_title, guest_id, guest_email, guest_name,
           host_email, check_in, check_out, guests, total_price, platform_fee, host_net, status)
@@ -99,9 +109,14 @@ export async function create(req, res) {
       [property_id, property.title, req.user.id, req.user.email, req.user.full_name,
        property.host_email, check_in, check_out, guests, total_price, platform_fee, host_net]
     );
+
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     sendServerError(res, err);
+  } finally {
+    client.release();
   }
 }
 

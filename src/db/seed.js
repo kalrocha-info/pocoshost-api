@@ -9,29 +9,29 @@ async function seed() {
     // Usuário demo admin
     const passwordHash = await bcrypt.hash('demo1234', 10);
     const userRes = await client.query(
-      `INSERT INTO users (full_name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name
+      `INSERT INTO users (full_name, email, password_hash, role, email_verified, email_verified_at)
+       VALUES ($1, $2, $3, $4, TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, email_verified = TRUE, email_verified_at = COALESCE(users.email_verified_at, NOW())
        RETURNING id, email`,
-      ['Carlos Alberto', 'admin@pocoshost.com.br', passwordHash, 'admin']
+      ['Carlos Alberto', 'admin@pocoshost.test', passwordHash, 'admin']
     );
     const adminId = userRes.rows[0].id;
 
     // Utilizadores E2E (Playwright smoke.spec.js)
     const guestHash = await bcrypt.hash('123456', 10);
     await client.query(
-      `INSERT INTO users (full_name, email, password_hash, role)
-       VALUES ($1, $2, $3, 'guest')
-       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
-      ['Hóspede Demo', 'guest@pocoshost.com', guestHash]
+      `INSERT INTO users (full_name, email, password_hash, role, email_verified, email_verified_at)
+       VALUES ($1, $2, $3, 'guest', TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, email_verified = TRUE, email_verified_at = COALESCE(users.email_verified_at, NOW())`,
+      ['Hóspede Demo', 'guest@pocoshost.test', guestHash]
     );
     const hostHash = await bcrypt.hash('123456', 10);
     const hostRes = await client.query(
-      `INSERT INTO users (full_name, email, password_hash, role, document_type, document_number)
-       VALUES ($1, $2, $3, 'host', 'cpf', '52998224725')
-       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+      `INSERT INTO users (full_name, email, password_hash, role, document_type, document_number, email_verified, email_verified_at)
+       VALUES ($1, $2, $3, 'host', 'cpf', '00000000000', TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, email_verified = TRUE, email_verified_at = COALESCE(users.email_verified_at, NOW())
        RETURNING id`,
-      ['Anfitrião Demo', 'host@pocoshost.com', hostHash]
+      ['Anfitrião Demo', 'host@pocoshost.test', hostHash]
     );
     const hostId = hostRes.rows[0]?.id ?? adminId;
 
@@ -63,7 +63,7 @@ async function seed() {
         category: 'pousada', tags: ['wifi','piscina','familia'],
         price_per_night: 320, rating: 4.9, review_count: 34,
         max_guests: 4, bedrooms: 2, bathrooms: 1,
-        host_name: 'Marina', host_email: 'admin@pocoshost.com.br',
+        host_name: 'Marina', host_email: 'admin@pocoshost.test',
         cover_photo: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=900&q=80',
         photos: ['https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=1200&q=80','https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80','https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=1200&q=80'],
         description: 'Hospedagem aconchegante com vista para a serra, café da manhã regional e fácil acesso aos principais pontos turísticos.',
@@ -76,7 +76,7 @@ async function seed() {
         category: 'chale', tags: ['wifi','rural','churrasco','pet_friendly'],
         price_per_night: 450, rating: 4.8, review_count: 21,
         max_guests: 2, bedrooms: 1, bathrooms: 1,
-        host_name: 'Rafael', host_email: 'admin@pocoshost.com.br',
+        host_name: 'Rafael', host_email: 'admin@pocoshost.test',
         cover_photo: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=900&q=80',
         photos: ['https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=1200&q=80','https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?w=1200&q=80'],
         description: 'Chalé reservado para casais, cercado por natureza e céu estrelado.',
@@ -89,7 +89,7 @@ async function seed() {
         category: 'apartamento', tags: ['wifi','economico','cozinha'],
         price_per_night: 210, rating: 4.7, review_count: 16,
         max_guests: 3, bedrooms: 1, bathrooms: 1,
-        host_name: 'Clara', host_email: 'admin@pocoshost.com.br',
+        host_name: 'Clara', host_email: 'admin@pocoshost.test',
         cover_photo: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80',
         photos: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80','https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&q=80'],
         description: 'Apartamento prático, iluminado e perto de cafés, parques e comércio local.',
@@ -101,7 +101,7 @@ async function seed() {
         category: 'casa', tags: ['piscina','churrasco','familia'],
         price_per_night: 590, rating: 4.9, review_count: 42,
         max_guests: 8, bedrooms: 3, bathrooms: 2,
-        host_name: 'Paulo', host_email: 'admin@pocoshost.com.br',
+        host_name: 'Paulo', host_email: 'admin@pocoshost.test',
         cover_photo: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&q=80',
         photos: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80','https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&q=80'],
         description: 'Casa espaçosa para famílias, com piscina privativa e área gourmet completa.',
@@ -134,15 +134,15 @@ async function seed() {
         `INSERT INTO reviews (property_id, user_id, user_email, guest_name, rating, comment)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT DO NOTHING`,
-        [firstPropertyId, adminId, 'admin@pocoshost.com.br', 'Ana', 5, 'Lugar lindo, limpo e muito acolhedor. A vista é especial.']
+        [firstPropertyId, adminId, 'admin@pocoshost.test', 'Ana', 5, 'Lugar lindo, limpo e muito acolhedor. A vista é especial.']
       );
     }
 
     await client.query('COMMIT');
     console.log('✅ Seed executado com sucesso.');
-    console.log('   Admin: admin@pocoshost.com.br / demo1234');
-    console.log('   Hóspede (E2E): guest@pocoshost.com / 123456');
-    console.log('   Anfitrião (E2E): host@pocoshost.com / 123456');
+    console.log('   Admin: admin@pocoshost.test / demo1234');
+    console.log('   Hóspede (E2E): guest@pocoshost.test / 123456');
+    console.log('   Anfitrião (E2E): host@pocoshost.test / 123456');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Erro no seed:', err.message);

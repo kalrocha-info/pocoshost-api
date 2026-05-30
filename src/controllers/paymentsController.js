@@ -113,8 +113,9 @@ export async function create(req, res) {
     const insertResult = await pool.query(
       `INSERT INTO payments
          (reservation_id, property_title, guest_email, host_email,
-          total_amount, platform_fee, host_net, card_last4, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+          total_amount, platform_fee, host_net, card_last4, status,
+          billing_type, gateway_payment_id, gateway_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [
         reservation_id,
         r.property_title,
@@ -125,6 +126,9 @@ export async function create(req, res) {
         r.host_net,
         billing_type === 'CREDIT_CARD' ? (card_last4 ?? null) : null,
         paymentStatus,
+        billing_type,
+        gatewayPaymentId,
+        gatewayStatus,
       ]
     );
 
@@ -137,8 +141,6 @@ export async function create(req, res) {
 
     res.status(201).json({
       ...insertResult.rows[0],
-      gateway_status: gatewayStatus,
-      gateway_payment_id: gatewayPaymentId,
       gateway_pix_qrcode: pixQrCode,
       gateway_pix_payload: pixPayload,
     });

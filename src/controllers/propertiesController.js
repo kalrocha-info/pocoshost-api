@@ -2,9 +2,27 @@ import { pool } from '../db/pool.js';
 import { sendServerError, assertUUID } from '../utils/http.js';
 
 export async function list(req, res) {
-  const { category, city, guests, sort = '-created_date', owner } = req.query;
+  const {
+    category,
+    city,
+    guests,
+    min_price,
+    max_price,
+    check_in,
+    check_out,
+    sort = '-created_date',
+    owner,
+  } = req.query;
   const conditions = ['p.is_active = true'];
   const params = [];
+
+  if ((check_in && !check_out) || (!check_in && check_out)) {
+    return res.status(400).json({ error: 'check_in e check_out devem ser informados juntos.' });
+  }
+
+  if (check_in && check_out && new Date(check_in) >= new Date(check_out)) {
+    return res.status(400).json({ error: 'check_out deve ser posterior ao check_in.' });
+  }
 
   // Filtro para listar apenas imóveis do anfitrião autenticado
   if (owner === 'me' && req.user?.id) {
@@ -15,7 +33,22 @@ export async function list(req, res) {
   if (category) { params.push(category); conditions.push(`p.category = $${params.length}`); }
   if (city) { params.push(`%${city}%`); conditions.push(`p.city ILIKE $${params.length}`); }
   if (guests) { params.push(Number(guests)); conditions.push(`p.max_guests >= $${params.length}`); }
-
+  if (min_price) { params.push(Number(min_price)); conditions.push(`p.price_per_night >= $${params.length}`); }
+  if (max_price) { params.push(Number(max_price)); conditions.push(`p.price_per_night <= $${params.length}`); }
+  if (check_in && check_out) {
+    params.push(check_in, check_out);
+    const checkInParam = params.length - 1;
+    const checkOutParam = params.length;
+    conditions.push(
+      `NOT EXISTS (
+        SELECT 1 FROM reservations r
+        WHERE r.property_id = p.id
+          AND r.status IN ('pending','confirmed')
+          AND r.check_in < $${checkOutParam}
+          AND r.check_out > $${checkInParam}
+      )`
+    );
+  }
   const orderCol = sort.startsWith('-') ? sort.slice(1) : sort;
   const orderDir = sort.startsWith('-') ? 'DESC' : 'ASC';
   const safeOrder = ['created_date','price_per_night','rating','title'].includes(orderCol)

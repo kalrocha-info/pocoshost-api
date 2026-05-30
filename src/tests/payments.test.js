@@ -14,8 +14,8 @@ function futureDate(n) {
 describe('PAYMENTS — /api/payments', () => {
   describe('POST / — criar pagamento', () => {
     it('cria pagamento e confirma reserva automaticamente', async () => {
-      const host = await createUser({ email: 'ph@p.com' });
-      const guest = await createUser({ email: 'pg@p.com' });
+      const host = await createUser({ email: 'ph@example.test' });
+      const guest = await createUser({ email: 'pg@example.test' });
       const prop = await createProperty(host.token, { price_per_night: 500 });
       const resv = await createReservation(guest.token, prop.id, {
         check_in: futureDate(1),
@@ -31,11 +31,14 @@ describe('PAYMENTS — /api/payments', () => {
       expect(Number(res.body.platform_fee)).toBeCloseTo(77.5, 1);
       expect(Number(res.body.host_net)).toBeCloseTo(422.5, 1);
       expect(res.body.card_last4).toBe('1234');
+      expect(res.body.billing_type).toBe('CREDIT_CARD');
+      expect(res.body.gateway_payment_id).toBe('pay_cc_test_mock');
+      expect(res.body.gateway_status).toBe('CONFIRMED');
     });
 
     it('confirma a reserva após pagamento', async () => {
-      const host = await createUser({ email: 'ph2@p.com' });
-      const guest = await createUser({ email: 'pg2@p.com' });
+      const host = await createUser({ email: 'ph2@example.test' });
+      const guest = await createUser({ email: 'pg2@example.test' });
       const prop = await createProperty(host.token);
       const resv = await createReservation(guest.token, prop.id);
       await request(app)
@@ -49,8 +52,8 @@ describe('PAYMENTS — /api/payments', () => {
     });
 
     it('cria pagamento PIX com status pending e dados de QR', async () => {
-      const host = await createUser({ email: 'ph-pix@p.com' });
-      const guest = await createUser({ email: 'pg-pix@p.com' });
+      const host = await createUser({ email: 'ph-pix@example.test' });
+      const guest = await createUser({ email: 'pg-pix@example.test' });
       const prop = await createProperty(host.token);
       const resv = await createReservation(guest.token, prop.id);
       const res = await request(app)
@@ -61,11 +64,14 @@ describe('PAYMENTS — /api/payments', () => {
       expect(res.body.status).toBe('pending');
       expect(res.body.gateway_pix_qrcode).toBeTruthy();
       expect(res.body.gateway_pix_payload).toContain('mock-pix');
+      expect(res.body.billing_type).toBe('PIX');
+      expect(res.body.gateway_payment_id).toBe('pay_pix_test_mock');
+      expect(res.body.gateway_status).toBe('PENDING');
     });
 
     it('rejeita pagamento sem dados de cartão quando billing_type é CREDIT_CARD', async () => {
-      const host = await createUser({ email: 'ph-no-card@p.com' });
-      const guest = await createUser({ email: 'pg-no-card@p.com' });
+      const host = await createUser({ email: 'ph-no-card@example.test' });
+      const guest = await createUser({ email: 'pg-no-card@example.test' });
       const prop = await createProperty(host.token);
       const resv = await createReservation(guest.token, prop.id);
       const res = await request(app)
@@ -76,7 +82,7 @@ describe('PAYMENTS — /api/payments', () => {
     });
 
     it('rejeita pagamento sem reservation_id', async () => {
-      const { token } = await createUser({ email: 'pg3@p.com' });
+      const { token } = await createUser({ email: 'pg3@example.test' });
       const res = await request(app)
         .post('/api/payments')
         .set('Authorization', `Bearer ${token}`)
@@ -85,7 +91,7 @@ describe('PAYMENTS — /api/payments', () => {
     });
 
     it('rejeita pagamento para reserva inexistente', async () => {
-      const { token } = await createUser({ email: 'pg4@p.com' });
+      const { token } = await createUser({ email: 'pg4@example.test' });
       const res = await request(app)
         .post('/api/payments')
         .set('Authorization', `Bearer ${token}`)
@@ -101,8 +107,8 @@ describe('PAYMENTS — /api/payments', () => {
 
   describe('GET / — listagem', () => {
     it('lista pagamentos do hóspede', async () => {
-      const host = await createUser({ email: 'lph@p.com' });
-      const guest = await createUser({ email: 'lpg@p.com' });
+      const host = await createUser({ email: 'lph@example.test' });
+      const guest = await createUser({ email: 'lpg@example.test' });
       const prop = await createProperty(host.token);
       const resv = await createReservation(guest.token, prop.id);
       await request(app)
@@ -114,11 +120,13 @@ describe('PAYMENTS — /api/payments', () => {
         .set('Authorization', `Bearer ${guest.token}`);
       expect(res.status).toBe(200);
       expect(res.body.length).toBe(1);
+      expect(res.body[0].gateway_payment_id).toBe('pay_cc_test_mock');
+      expect(res.body[0].gateway_status).toBe('CONFIRMED');
     });
 
     it('lista pagamentos do anfitrião com role=host', async () => {
-      const host = await createUser({ email: 'lph2@p.com' });
-      const guest = await createUser({ email: 'lpg2@p.com' });
+      const host = await createUser({ email: 'lph2@example.test' });
+      const guest = await createUser({ email: 'lpg2@example.test' });
       const prop = await createProperty(host.token);
       const resv = await createReservation(guest.token, prop.id);
       await request(app)
@@ -130,6 +138,8 @@ describe('PAYMENTS — /api/payments', () => {
         .set('Authorization', `Bearer ${host.token}`);
       expect(res.status).toBe(200);
       expect(res.body.length).toBe(1);
+      expect(res.body[0].gateway_payment_id).toBe('pay_cc_test_mock');
+      expect(res.body[0].gateway_status).toBe('CONFIRMED');
     });
 
     it('rejeita sem autenticação', async () => {

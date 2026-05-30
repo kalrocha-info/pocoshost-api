@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { createApp } from '../testApp.js';
-import { createUser, createProperty } from './helpers/factories.js';
+import { createUser, createProperty, createReservation } from './helpers/factories.js';
 
 const app = createApp();
 
@@ -41,6 +41,38 @@ describe('PROPERTIES — /api/properties', () => {
       const res = await request(app).get('/api/properties?guests=5');
       expect(res.status).toBe(200);
       expect(res.body.every(p => p.max_guests >= 5)).toBe(true);
+    });
+
+    it('filtra por faixa de preço', async () => {
+      const { token } = await createUser();
+      await createProperty(token, { price_per_night: 120, title: 'Economico' });
+      await createProperty(token, { price_per_night: 450, title: 'Premium' });
+      await createProperty(token, { price_per_night: 900, title: 'Luxo' });
+      const res = await request(app).get('/api/properties?min_price=200&max_price=600');
+      expect(res.status).toBe(200);
+      expect(res.body.every(p => Number(p.price_per_night) >= 200 && Number(p.price_per_night) <= 600)).toBe(true);
+    });
+
+    it('exclui imóveis com reserva conflitante no período', async () => {
+      const host = await createUser({ email: 'host-busca@example.test' });
+      const guest = await createUser({ email: 'guest-busca@example.test' });
+      const booked = await createProperty(host.token, { title: 'Indisponivel no periodo' });
+      const available = await createProperty(host.token, { title: 'Livre no periodo' });
+
+      await createReservation(guest.token, booked.id, {
+        check_in: '2026-07-10',
+        check_out: '2026-07-14',
+      });
+
+      const res = await request(app).get('/api/properties?check_in=2026-07-12&check_out=2026-07-16');
+      expect(res.status).toBe(200);
+      expect(res.body.some(p => p.id === booked.id)).toBe(false);
+      expect(res.body.some(p => p.id === available.id)).toBe(true);
+    });
+
+    it('rejeita busca com período incompleto', async () => {
+      const res = await request(app).get('/api/properties?check_in=2026-07-12');
+      expect(res.status).toBe(400);
     });
   });
 
@@ -121,8 +153,8 @@ describe('PROPERTIES — /api/properties', () => {
     });
 
     it('impede atualização por outro utilizador', async () => {
-      const owner = await createUser({ email: 'owner@test.com' });
-      const other = await createUser({ email: 'other@test.com' });
+      const owner = await createUser({ email: 'owner@example.test' });
+      const other = await createUser({ email: 'other@example.test' });
       const prop = await createProperty(owner.token);
       const res = await request(app).put(`/api/properties/${prop.id}`)
         .set('Authorization', `Bearer ${other.token}`)
@@ -151,8 +183,8 @@ describe('PROPERTIES — /api/properties', () => {
     });
 
     it('impede eliminação por outro utilizador', async () => {
-      const owner = await createUser({ email: 'owner2@test.com' });
-      const other = await createUser({ email: 'other2@test.com' });
+      const owner = await createUser({ email: 'owner2@example.test' });
+      const other = await createUser({ email: 'other2@example.test' });
       const prop = await createProperty(owner.token);
       const res = await request(app).delete(`/api/properties/${prop.id}`)
         .set('Authorization', `Bearer ${other.token}`);

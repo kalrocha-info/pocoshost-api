@@ -8,8 +8,8 @@ describe('FAVORITES — /api/favorites', () => {
 
   describe('POST /toggle', () => {
     it('adiciona favorito', async () => {
-      const host = await createUser({ email: 'fh@fv.com' });
-      const guest = await createUser({ email: 'fg@fv.com' });
+      const host = await createUser({ email: 'fh@example.test' });
+      const guest = await createUser({ email: 'fg@example.test' });
       const prop = await createProperty(host.token);
       const res = await request(app).post('/api/favorites/toggle')
         .set('Authorization', `Bearer ${guest.token}`)
@@ -19,8 +19,8 @@ describe('FAVORITES — /api/favorites', () => {
     });
 
     it('remove favorito ao fazer toggle novamente', async () => {
-      const host = await createUser({ email: 'fh2@fv.com' });
-      const guest = await createUser({ email: 'fg2@fv.com' });
+      const host = await createUser({ email: 'fh2@example.test' });
+      const guest = await createUser({ email: 'fg2@example.test' });
       const prop = await createProperty(host.token);
       await request(app).post('/api/favorites/toggle')
         .set('Authorization', `Bearer ${guest.token}`)
@@ -33,7 +33,7 @@ describe('FAVORITES — /api/favorites', () => {
     });
 
     it('rejeita sem autenticação', async () => {
-      const { token } = await createUser({ email: 'fh3@fv.com' });
+      const { token } = await createUser({ email: 'fh3@example.test' });
       const prop = await createProperty(token);
       const res = await request(app).post('/api/favorites/toggle')
         .send({ property_id: prop.id });
@@ -41,7 +41,7 @@ describe('FAVORITES — /api/favorites', () => {
     });
 
     it('rejeita sem property_id', async () => {
-      const { token } = await createUser({ email: 'fg3@fv.com' });
+      const { token } = await createUser({ email: 'fg3@example.test' });
       const res = await request(app).post('/api/favorites/toggle')
         .set('Authorization', `Bearer ${token}`)
         .send({});
@@ -51,8 +51,8 @@ describe('FAVORITES — /api/favorites', () => {
 
   describe('GET /', () => {
     it('lista favoritos do utilizador', async () => {
-      const host = await createUser({ email: 'lh@fv.com' });
-      const guest = await createUser({ email: 'lg@fv.com' });
+      const host = await createUser({ email: 'lh@example.test' });
+      const guest = await createUser({ email: 'lg@example.test' });
       const p1 = await createProperty(host.token, { title: 'Fav 1' });
       const p2 = await createProperty(host.token, { title: 'Fav 2' });
       await request(app).post('/api/favorites/toggle')
@@ -66,9 +66,9 @@ describe('FAVORITES — /api/favorites', () => {
     });
 
     it('não mostra favoritos de outros utilizadores', async () => {
-      const host = await createUser({ email: 'lh2@fv.com' });
-      const g1 = await createUser({ email: 'lg2@fv.com' });
-      const g2 = await createUser({ email: 'lg3@fv.com' });
+      const host = await createUser({ email: 'lh2@example.test' });
+      const g1 = await createUser({ email: 'lg2@example.test' });
+      const g2 = await createUser({ email: 'lg3@example.test' });
       const prop = await createProperty(host.token);
       await request(app).post('/api/favorites/toggle')
         .set('Authorization', `Bearer ${g1.token}`).send({ property_id: prop.id });
@@ -86,8 +86,8 @@ describe('FAVORITES — /api/favorites', () => {
 
   describe('GET /check/:propertyId', () => {
     it('confirma que imóvel está nos favoritos', async () => {
-      const host = await createUser({ email: 'ch@fv.com' });
-      const guest = await createUser({ email: 'cg@fv.com' });
+      const host = await createUser({ email: 'ch@example.test' });
+      const guest = await createUser({ email: 'cg@example.test' });
       const prop = await createProperty(host.token);
       await request(app).post('/api/favorites/toggle')
         .set('Authorization', `Bearer ${guest.token}`).send({ property_id: prop.id });
@@ -98,8 +98,8 @@ describe('FAVORITES — /api/favorites', () => {
     });
 
     it('confirma que imóvel não está nos favoritos', async () => {
-      const host = await createUser({ email: 'ch2@fv.com' });
-      const guest = await createUser({ email: 'cg2@fv.com' });
+      const host = await createUser({ email: 'ch2@example.test' });
+      const guest = await createUser({ email: 'cg2@example.test' });
       const prop = await createProperty(host.token);
       const res = await request(app).get(`/api/favorites/check/${prop.id}`)
         .set('Authorization', `Bearer ${guest.token}`);

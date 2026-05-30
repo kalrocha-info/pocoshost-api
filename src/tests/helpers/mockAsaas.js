@@ -14,8 +14,8 @@ vi.mock('../../services/asaasService.js', () => ({
     id: 'cus_test_mock_001',
     name: user?.name ?? 'Teste Vitest',
     email: user?.email ?? 'test@vitest.local',
-    cpfCnpj: user?.cpf ?? '52998224725',
-    phone: user?.phone ?? '35999999999',
+    cpfCnpj: user?.cpf ?? '00000000000',
+    phone: user?.phone ?? '00000000000',
   })),
   createCreditCardPayment: vi.fn(async () => ({
     id: 'pay_cc_test_mock',
