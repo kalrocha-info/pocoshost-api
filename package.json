@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
+    "build": "node -e \"console.log(\u0027pocoshost-api: no build step\u0027)\"",
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
