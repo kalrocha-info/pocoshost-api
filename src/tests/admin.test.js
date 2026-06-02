@@ -89,6 +89,18 @@ describe('ADMIN — /api/admin', () => {
     expect(res.status).toBe(400);
   });
 
+  it('permite configurar wallet Asaas de anfitrião pelo painel', async () => {
+    const admin = await createAdmin();
+    const host = await createUser({ role: 'host', email: 'host-wallet-admin@example.test', asaas_wallet_id: null });
+    const res = await request(app)
+      .put(`/api/admin/hosts/${host.user.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ asaas_wallet_id: 'wal_host_admin_test' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.asaas_wallet_id).toBe('wal_host_admin_test');
+  });
+
   it('lista imoveis usando created_by/is_active do schema real', async () => {
     const admin = await createAdmin();
     const host = await createUser({ role: 'host', email: 'host-admin-prop@example.test' });

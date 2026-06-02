@@ -69,6 +69,19 @@ describe('PAYMENTS — /api/payments', () => {
       expect(res.body.gateway_status).toBe('PENDING');
     });
 
+    it('rejeita pagamento quando anfitrião não possui wallet Asaas', async () => {
+      const host = await createUser({ email: 'ph-no-wallet@example.test', asaas_wallet_id: null });
+      const guest = await createUser({ email: 'pg-no-wallet@example.test' });
+      const prop = await createProperty(host.token);
+      const resv = await createReservation(guest.token, prop.id);
+      const res = await request(app)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${guest.token}`)
+        .send(pixPaymentPayload(resv.id));
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/Anfitrião ainda não está habilitado/);
+    });
+
     it('rejeita pagamento sem dados de cartão quando billing_type é CREDIT_CARD', async () => {
       const host = await createUser({ email: 'ph-no-card@example.test' });
       const guest = await createUser({ email: 'pg-no-card@example.test' });

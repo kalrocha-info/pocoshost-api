@@ -15,6 +15,9 @@ function mapWebhookPaymentStatus(status) {
 
 export async function asaas(req, res) {
   try {
+    if (!process.env.ASAAS_WEBHOOK_TOKEN) {
+      return res.status(503).json({ error: 'Webhook indisponível.' });
+    }
     const token = req.headers['asaas-access-token'] || req.headers['x-asaas-access-token'];
     if (token !== process.env.ASAAS_WEBHOOK_TOKEN) {
       return res.status(403).json({ error: 'Token ASAAS inválido.' });

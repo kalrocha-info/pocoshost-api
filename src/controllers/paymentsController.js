@@ -20,6 +20,10 @@ function normalizeCardNumber(value) {
   return value?.replace(/\D/g, '') ?? '';
 }
 
+function normalizeDigits(value) {
+  return value?.replace(/\D/g, '') ?? '';
+}
+
 export async function create(req, res) {
   const {
     reservation_id,
@@ -29,31 +33,51 @@ export async function create(req, res) {
     card_holder_name,
     card_expiry,
     card_cvv,
+    billing_cpf_cnpj,
+    billing_phone,
+    billing_postal_code,
+    billing_address_number,
   } = req.body;
 
   if (!reservation_id) return res.status(400).json({ error: 'reservation_id é obrigatório.' });
 
+  let client;
   try {
-    const resv = await pool.query('SELECT * FROM reservations WHERE id = $1', [reservation_id]);
-    if (!resv.rows[0]) return res.status(404).json({ error: 'Reserva não encontrada.' });
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const resv = await client.query('SELECT * FROM reservations WHERE id = $1 FOR UPDATE', [reservation_id]);
+    if (!resv.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Reserva não encontrada.' });
+    }
     const r = resv.rows[0];
 
     if (r.guest_id !== req.user.id) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Sem permissão para pagar esta reserva.' });
     }
 
-    const existing = await pool.query('SELECT * FROM payments WHERE reservation_id = $1', [reservation_id]);
+    const existing = await client.query('SELECT * FROM payments WHERE reservation_id = $1', [reservation_id]);
     if (existing.rows[0]) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Esta reserva já possui pagamento registrado.' });
     }
 
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
     const guest = userResult.rows[0];
+    const hostResult = await client.query('SELECT asaas_wallet_id FROM users WHERE email = $1', [r.host_email]);
+    const hostWalletId = hostResult.rows[0]?.asaas_wallet_id;
+    if (!hostWalletId) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Anfitrião ainda não está habilitado para receber pagamentos.' });
+    }
+
     const customer = await findOrCreateCustomer({
       name: guest.full_name,
       email: guest.email,
-      cpf: guest.document_number,
-      phone: guest.phone,
+      cpf: billing_cpf_cnpj || guest.document_number,
+      phone: billing_phone || guest.phone,
     });
 
     let paymentStatus = 'pending';
@@ -63,9 +87,11 @@ export async function create(req, res) {
     let pixPayload = null;
 
     if (billing_type === 'CREDIT_CARD') {
-      if (!card_number || !card_holder_name || !card_expiry || !card_cvv) {
+      if (!card_number || !card_holder_name || !card_expiry || !card_cvv ||
+          !billing_cpf_cnpj || !billing_phone || !billing_postal_code || !billing_address_number) {
+        await client.query('ROLLBACK');
         return res.status(400).json({
-          error: 'Dados do cartão de crédito incompletos. Informe número, titular, validade e CVV.'
+          error: 'Dados do cartão incompletos. Informe cartão, CPF/CNPJ, telefone, CEP e número do endereço.'
         });
       }
 
@@ -83,7 +109,16 @@ export async function create(req, res) {
           expiry: card_expiry,
           cvv: card_cvv,
         },
-        hostWalletId: process.env.ASAAS_WALLET_POCOSHOST,
+        holderInfo: {
+          name: card_holder_name,
+          email: guest.email,
+          cpfCnpj: normalizeDigits(billing_cpf_cnpj),
+          phone: normalizeDigits(billing_phone),
+          postalCode: normalizeDigits(billing_postal_code),
+          addressNumber: billing_address_number,
+        },
+        remoteIp: req.ip,
+        hostWalletId,
       });
 
       gatewayStatus = asaasPayment.status;
@@ -98,7 +133,7 @@ export async function create(req, res) {
           propertyName: r.property_title,
           description: r.property_title,
         },
-        hostWalletId: process.env.ASAAS_WALLET_POCOSHOST,
+        hostWalletId,
       });
 
       gatewayStatus = asaasPix.status;
@@ -107,10 +142,11 @@ export async function create(req, res) {
       pixQrCode = asaasPix.pix.encodedImage;
       pixPayload = asaasPix.pix.payload;
     } else {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Método de pagamento não suportado.' });
     }
 
-    const insertResult = await pool.query(
+    const insertResult = await client.query(
       `INSERT INTO payments
          (reservation_id, property_title, guest_email, host_email,
           total_amount, platform_fee, host_net, card_last4, status,
@@ -133,11 +169,13 @@ export async function create(req, res) {
     );
 
     if (paymentStatus === 'paid') {
-      await pool.query(
+      await client.query(
         `UPDATE reservations SET status = 'confirmed', updated_date = NOW() WHERE id = $1`,
         [reservation_id]
       );
     }
+
+    await client.query('COMMIT');
 
     res.status(201).json({
       ...insertResult.rows[0],
@@ -145,6 +183,9 @@ export async function create(req, res) {
       gateway_pix_payload: pixPayload,
     });
   } catch (err) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     sendServerError(res, err);
+  } finally {
+    client?.release();
   }
 }

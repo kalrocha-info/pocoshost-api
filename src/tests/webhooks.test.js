@@ -45,6 +45,16 @@ function futureDate(n) {
 describe('WEBHOOKS — /api/webhooks/asaas', () => {
 
   describe('Autenticação do webhook', () => {
+    it('rejeita configuração ausente do token (503)', async () => {
+      const previousToken = process.env.ASAAS_WEBHOOK_TOKEN;
+      delete process.env.ASAAS_WEBHOOK_TOKEN;
+      const res = await request(app)
+        .post('/api/webhooks/asaas')
+        .send({ event: 'PAYMENT_UPDATED', payment: null });
+      process.env.ASAAS_WEBHOOK_TOKEN = previousToken;
+      expect(res.status).toBe(503);
+    });
+
     it('rejeita requisição sem token (403)', async () => {
       const res = await request(app)
         .post('/api/webhooks/asaas')

@@ -112,7 +112,7 @@ export async function listHosts(req, res) {
 
     const where = filters.join(' AND ');
     const result = await pool.query(
-      `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.created_date,
+      `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.asaas_wallet_id, u.created_date,
               COUNT(DISTINCT p.id) AS properties_count,
               COUNT(DISTINCT r.id) AS reservations_count,
               COALESCE(SUM(CASE WHEN r.status IN ('confirmed', 'completed') THEN r.total_price ELSE 0 END), 0) AS total_revenue
@@ -136,7 +136,7 @@ export async function listHosts(req, res) {
 export async function getHost(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, email, full_name, phone, role, document_type, company_name, address_info, created_date
+      `SELECT id, email, full_name, phone, role, document_type, company_name, address_info, asaas_wallet_id, created_date
        FROM users WHERE id = $1 AND role = 'host'`,
       [req.params.id]
     );
@@ -159,7 +159,7 @@ export async function getHost(req, res) {
 
 export async function createHost(req, res) {
   try {
-    const { email, full_name, phone, password, document_type, document_number, company_name, address_info } = req.body;
+    const { email, full_name, phone, password, document_type, document_number, company_name, address_info, asaas_wallet_id } = req.body;
     if (!email || !full_name || !password) {
       return res.status(400).json({ error: 'Email, nome e senha sao obrigatorios.' });
     }
@@ -167,10 +167,10 @@ export async function createHost(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users
-        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info)
-       VALUES ($1, $2, $3, $4, 'host', $5, $6, $7, $8)
-       RETURNING id, email, full_name, phone, role, document_type, company_name, created_date`,
-      [email, full_name, phone || null, passwordHash, document_type || null, document_number || null, company_name || null, address_info || null]
+        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info, asaas_wallet_id)
+       VALUES ($1, $2, $3, $4, 'host', $5, $6, $7, $8, $9)
+       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, created_date`,
+      [email, full_name, phone || null, passwordHash, document_type || null, document_number || null, company_name || null, address_info || null, asaas_wallet_id || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -182,13 +182,14 @@ export async function createHost(req, res) {
 
 export async function updateHost(req, res) {
   try {
-    const { full_name, phone, password, document_type, document_number, company_name, address_info } = req.body;
+    const { full_name, phone, password, document_type, document_number, company_name, address_info, asaas_wallet_id } = req.body;
     const existing = await pool.query("SELECT id FROM users WHERE id = $1 AND role = 'host'", [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ error: 'Anfitriao nao encontrado.' });
 
     const updates = [];
     const params = [];
-    const fields = { full_name, phone, document_type, document_number, company_name, address_info };
+    const fields = { full_name, phone, document_type, document_number, company_name, address_info,
+      asaas_wallet_id: asaas_wallet_id === undefined ? undefined : (asaas_wallet_id || null) };
     for (const [field, value] of Object.entries(fields)) {
       if (value !== undefined) {
         params.push(value);
@@ -205,7 +206,7 @@ export async function updateHost(req, res) {
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')}, updated_date = NOW()
        WHERE id = $${params.length}
-       RETURNING id, email, full_name, phone, role, document_type, company_name, created_date`,
+       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, created_date`,
       params
     );
     res.json(result.rows[0]);

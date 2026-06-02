@@ -97,13 +97,18 @@ export const schemas = {
     card_holder_name: z.string().optional(),
     card_expiry: z.string().optional(),
     card_cvv: z.string().optional(),
+    billing_cpf_cnpj: z.string().optional(),
+    billing_phone: z.string().optional(),
+    billing_postal_code: z.string().optional(),
+    billing_address_number: z.string().optional(),
   }).refine((data) => {
     if (data.billing_type === 'PIX') return true;
     const hasCardData = data.card_number || data.card_holder_name || data.card_expiry || data.card_cvv;
     if (!hasCardData) return false;
-    return Boolean(data.card_number && data.card_holder_name && data.card_expiry && data.card_cvv);
+    return Boolean(data.card_number && data.card_holder_name && data.card_expiry && data.card_cvv &&
+      data.billing_cpf_cnpj && data.billing_phone && data.billing_postal_code && data.billing_address_number);
   }, {
-    message: 'Para pagar com cartão, é necessário informar número, nome, validade e CVV.',
+    message: 'Para pagar com cartão, informe cartão, CPF/CNPJ, telefone, CEP e número do endereço.',
     path: ['card_number'],
   }),
 

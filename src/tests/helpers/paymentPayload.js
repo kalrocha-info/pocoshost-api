@@ -8,6 +8,10 @@ export function creditCardPaymentPayload(reservationId, overrides = {}) {
     card_expiry: '12/30',
     card_cvv: '123',
     card_last4: '1111',
+    billing_cpf_cnpj: '00000000000',
+    billing_phone: '00000000000',
+    billing_postal_code: '00000000',
+    billing_address_number: '100',
     ...overrides,
   };
 }

@@ -25,8 +25,8 @@ export async function createUser(overrides = {}) {
   const result = await pool.query(
     `INSERT INTO users
       (full_name, email, password_hash, role, document_type, document_number,
-       company_name, address_info, email_verified, email_verified_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE,NOW())
+       company_name, address_info, asaas_wallet_id, email_verified, email_verified_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,NOW())
      RETURNING id, email, full_name, role, email_verified`,
     [
       overrides.full_name ?? 'Teste User',
@@ -37,6 +37,7 @@ export async function createUser(overrides = {}) {
       documentNumber,
       overrides.company_name,
       overrides.address_info,
+      Object.prototype.hasOwnProperty.call(overrides, 'asaas_wallet_id') ? overrides.asaas_wallet_id : 'wal_host_test_mock',
     ]
   );
   const user = result.rows[0];

@@ -112,12 +112,15 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 -- Campos de conciliação com gateway de pagamento (Asaas)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS asaas_wallet_id VARCHAR(120);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_type VARCHAR(50);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_payment_id VARCHAR(120);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_status VARCHAR(80);
 CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_payment_id_idx
   ON payments(gateway_payment_id)
   WHERE gateway_payment_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS payments_reservation_id_idx
+  ON payments(reservation_id);
 
 -- Campos LGPD para anonimização de contas
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_anonymized BOOLEAN NOT NULL DEFAULT FALSE;
