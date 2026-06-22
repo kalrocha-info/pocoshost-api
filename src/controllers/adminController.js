@@ -1,9 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { sendServerError } from '../utils/http.js';
+import { RESERVATION_HOLD_MINUTES } from '../services/reservationExpirationService.js';
 
 const VALID_ROLES = ['guest', 'host', 'admin'];
-const VALID_RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed'];
+const VALID_RESERVATION_STATUSES = ['pending', 'approved', 'confirmed', 'cancelled', 'completed'];
+const VALID_ACCOUNT_STATUSES = ['active', 'blocked'];
 
 function parsePagination(query) {
   const page = Math.max(Number(query.page) || 1, 1);
@@ -28,6 +30,13 @@ function compactUser(row) {
   if (!row) return row;
   const { document_number, ...safe } = row;
   return safe;
+}
+
+function sendUniqueUserConflict(res, err, emailMessage = 'Email ja cadastrado.') {
+  if (err.constraint === 'users_document_number_active_unique_idx') {
+    return res.status(409).json({ error: 'CPF/CNPJ ja cadastrado.' });
+  }
+  return res.status(409).json({ error: emailMessage });
 }
 
 export async function getStats(req, res) {
@@ -112,7 +121,7 @@ export async function listHosts(req, res) {
 
     const where = filters.join(' AND ');
     const result = await pool.query(
-      `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.asaas_wallet_id, u.created_date,
+      `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.asaas_wallet_id, u.account_status, u.created_date,
               COUNT(DISTINCT p.id) AS properties_count,
               COUNT(DISTINCT r.id) AS reservations_count,
               COALESCE(SUM(CASE WHEN r.status IN ('confirmed', 'completed') THEN r.total_price ELSE 0 END), 0) AS total_revenue
@@ -136,7 +145,7 @@ export async function listHosts(req, res) {
 export async function getHost(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, email, full_name, phone, role, document_type, company_name, address_info, asaas_wallet_id, created_date
+      `SELECT id, email, full_name, phone, role, document_type, company_name, address_info, asaas_wallet_id, account_status, created_date
        FROM users WHERE id = $1 AND role = 'host'`,
       [req.params.id]
     );
@@ -167,28 +176,35 @@ export async function createHost(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users
-        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info, asaas_wallet_id)
-       VALUES ($1, $2, $3, $4, 'host', $5, $6, $7, $8, $9)
-       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, created_date`,
+        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info, asaas_wallet_id, email_verified, email_verified_at)
+       VALUES ($1, $2, $3, $4, 'host', $5, $6, $7, $8, $9, TRUE, NOW())
+       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, account_status, created_date`,
       [email, full_name, phone || null, passwordHash, document_type || null, document_number || null, company_name || null, address_info || null, asaas_wallet_id || null]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email ja cadastrado.' });
+    if (err.code === '23505') return sendUniqueUserConflict(res, err);
     sendServerError(res, err);
   }
 }
 
 export async function updateHost(req, res) {
   try {
-    const { full_name, phone, password, document_type, document_number, company_name, address_info, asaas_wallet_id } = req.body;
+    const { full_name, phone, password, document_type, document_number, company_name, address_info, asaas_wallet_id, account_status } = req.body;
+    if (account_status && !VALID_ACCOUNT_STATUSES.includes(account_status)) {
+      return res.status(400).json({ error: 'Status de conta invalido.' });
+    }
+    if (isSelf(req, req.params.id) && account_status === 'blocked') {
+      return res.status(400).json({ error: 'Voce nao pode bloquear a propria conta.' });
+    }
     const existing = await pool.query("SELECT id FROM users WHERE id = $1 AND role = 'host'", [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ error: 'Anfitriao nao encontrado.' });
 
     const updates = [];
     const params = [];
     const fields = { full_name, phone, document_type, document_number, company_name, address_info,
+      account_status,
       asaas_wallet_id: asaas_wallet_id === undefined ? undefined : (asaas_wallet_id || null) };
     for (const [field, value] of Object.entries(fields)) {
       if (value !== undefined) {
@@ -206,7 +222,7 @@ export async function updateHost(req, res) {
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')}, updated_date = NOW()
        WHERE id = $${params.length}
-       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, created_date`,
+       RETURNING id, email, full_name, phone, role, document_type, company_name, asaas_wallet_id, account_status, created_date`,
       params
     );
     res.json(result.rows[0]);
@@ -221,15 +237,16 @@ export async function deleteHost(req, res) {
       return res.status(400).json({ error: 'Voce nao pode remover a propria conta.' });
     }
 
-    const activeReservations = await pool.query(
-      `SELECT COUNT(*) FROM reservations r
-       JOIN properties p ON r.property_id = p.id
-       WHERE p.created_by = $1 AND r.status IN ('pending', 'confirmed')`,
+    const propertiesCount = await pool.query(
+      'SELECT COUNT(*) FROM properties WHERE created_by = $1',
       [req.params.id]
     );
 
-    if (Number(activeReservations.rows[0].count) > 0) {
-      return res.status(400).json({ error: 'Nao e possivel remover anfitriao com reservas ativas.' });
+    if (Number(propertiesCount.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: 'Nao e possivel remover anfitriao com imoveis cadastrados. Desative, transfira ou remova os imoveis antes de remover o anfitriao.',
+        code: 'HOST_HAS_PROPERTIES',
+      });
     }
 
     const result = await pool.query("DELETE FROM users WHERE id = $1 AND role = 'host' RETURNING id", [req.params.id]);
@@ -242,7 +259,7 @@ export async function deleteHost(req, res) {
 
 export async function listAllProperties(req, res) {
   try {
-    const { search, owner_id, category, status } = req.query;
+    const { search, owner_id, category, status, booking_status } = req.query;
     const { page, limit, offset } = parsePagination(req.query);
     const params = [];
     const filters = ['1=1'];
@@ -252,24 +269,57 @@ export async function listAllProperties(req, res) {
     if (category) { params.push(category); filters.push(`p.category = $${params.length}`); }
     const active = propertyStatusToActive(status);
     if (active !== undefined) { params.push(active); filters.push(`p.is_active = $${params.length}`); }
+    if (booking_status === 'available') {
+      filters.push('current_reservation.id IS NULL');
+    }
+    if (booking_status === 'reserved') {
+      filters.push("current_reservation.status = 'approved'");
+    }
+    if (booking_status === 'in_use' || booking_status === 'occupied') {
+      filters.push("current_reservation.status = 'confirmed'");
+    }
 
     const where = filters.join(' AND ');
+    const fromClause = `
+       FROM properties p
+       LEFT JOIN users owner ON p.created_by = owner.id
+       LEFT JOIN property_categories c ON p.category = c.slug
+       LEFT JOIN LATERAL (
+         SELECT r.id, r.status, r.check_in, r.check_out, r.guest_name, r.guest_email, r.guest_id
+         FROM reservations r
+         WHERE r.property_id = p.id
+           AND r.status IN ('approved', 'confirmed')
+           AND CURRENT_DATE >= r.check_in
+           AND CURRENT_DATE < r.check_out
+         ORDER BY CASE WHEN r.status = 'confirmed' THEN 0 ELSE 1 END, r.check_in
+         LIMIT 1
+       ) current_reservation ON TRUE
+       LEFT JOIN users current_guest ON current_guest.id = current_reservation.guest_id`;
     const result = await pool.query(
       `SELECT p.*, p.created_by AS owner_id, p.category AS category_slug,
               CASE WHEN p.is_active THEN 'active' ELSE 'inactive' END AS status,
               p.created_date AS created_at,
-              owner.full_name AS owner_name, owner.email AS owner_email,
+              COALESCE(owner.full_name, p.host_name, p.host_email) AS owner_name,
+              COALESCE(owner.email, p.host_email) AS owner_email,
               c.name AS category_name,
-              (SELECT COUNT(*) FROM reservations r WHERE r.property_id = p.id) AS reservations_count
-       FROM properties p
-       LEFT JOIN users owner ON p.created_by = owner.id
-       LEFT JOIN property_categories c ON p.category = c.slug
+              (SELECT COUNT(*) FROM reservations r WHERE r.property_id = p.id) AS reservations_count,
+              current_reservation.id AS current_reservation_id,
+              CASE
+                WHEN current_reservation.id IS NOT NULL AND current_reservation.status = 'confirmed' THEN 'in_use'
+                WHEN current_reservation.id IS NOT NULL THEN 'reserved'
+                ELSE 'available'
+              END AS current_booking_status,
+              current_reservation.status AS current_reservation_status,
+              current_reservation.check_in AS current_check_in,
+              current_reservation.check_out AS current_check_out,
+              COALESCE(current_reservation.guest_name, current_guest.full_name, current_reservation.guest_email) AS current_guest_name
+       ${fromClause}
        WHERE ${where}
        ORDER BY p.created_date DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
     );
-    const countResult = await pool.query(`SELECT COUNT(*) FROM properties p WHERE ${where}`, params);
+    const countResult = await pool.query(`SELECT COUNT(*) ${fromClause} WHERE ${where}`, params);
     res.json({ properties: result.rows, total: Number(countResult.rows[0].count), page, limit });
   } catch (err) {
     sendServerError(res, err);
@@ -353,7 +403,7 @@ export async function updatePropertyAdmin(req, res) {
 export async function deletePropertyAdmin(req, res) {
   try {
     const activeReservations = await pool.query(
-      "SELECT COUNT(*) FROM reservations WHERE property_id = $1 AND status IN ('pending', 'confirmed')",
+      "SELECT COUNT(*) FROM reservations WHERE property_id = $1 AND status IN ('pending', 'approved', 'confirmed')",
       [req.params.id]
     );
     if (Number(activeReservations.rows[0].count) > 0) {
@@ -416,9 +466,18 @@ export async function updateReservationAdmin(req, res) {
       return res.status(400).json({ error: 'Status invalido.' });
     }
 
+    const updates =
+      status === 'approved'
+        ? `status = $1, expires_at = NOW() + ($3 * INTERVAL '1 minute'), expired_at = NULL, updated_date = NOW()`
+        : `status = $1, updated_date = NOW()`;
+    const params =
+      status === 'approved'
+        ? [status, req.params.id, RESERVATION_HOLD_MINUTES]
+        : [status, req.params.id];
+
     const result = await pool.query(
-      'UPDATE reservations SET status = $1, updated_date = NOW() WHERE id = $2 RETURNING *',
-      [status, req.params.id]
+      `UPDATE reservations SET ${updates} WHERE id = $2 RETURNING *`,
+      params
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Reserva nao encontrada.' });
     res.json(result.rows[0]);
@@ -507,13 +566,31 @@ export async function listUsers(req, res) {
 
     const where = filters.join(' AND ');
     const result = await pool.query(
-      `SELECT id, email, full_name, phone, role, document_type, company_name, created_date
-       FROM users WHERE ${where}
-       ORDER BY created_date DESC
+      `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.document_type, u.company_name,
+              u.account_status, u.created_date,
+              COALESCE(guest_reservations.active_guest_reservations_count, 0) AS active_guest_reservations_count,
+              COALESCE(host_properties.properties_count, 0) AS properties_count,
+              COALESCE(host_properties.active_properties_count, 0) AS active_properties_count
+       FROM users u
+       LEFT JOIN (
+         SELECT guest_id, COUNT(*) AS active_guest_reservations_count
+         FROM reservations
+         WHERE status IN ('pending', 'approved', 'confirmed')
+         GROUP BY guest_id
+       ) guest_reservations ON guest_reservations.guest_id = u.id
+       LEFT JOIN (
+         SELECT created_by,
+                COUNT(*) AS properties_count,
+                COUNT(*) FILTER (WHERE is_active = TRUE) AS active_properties_count
+         FROM properties
+         GROUP BY created_by
+       ) host_properties ON host_properties.created_by = u.id
+       WHERE ${where}
+       ORDER BY u.created_date DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
     );
-    const countResult = await pool.query(`SELECT COUNT(*) FROM users WHERE ${where}`, params);
+    const countResult = await pool.query(`SELECT COUNT(*) FROM users u WHERE ${where}`, params);
     res.json({ users: result.rows, total: Number(countResult.rows[0].count), page, limit });
   } catch (err) {
     sendServerError(res, err);
@@ -548,26 +625,32 @@ export async function createUser(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users
-        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, email, full_name, phone, role, document_type, company_name, created_date`,
+        (email, full_name, phone, password_hash, role, document_type, document_number, company_name, address_info, email_verified, email_verified_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,NOW())
+       RETURNING id, email, full_name, phone, role, document_type, company_name, account_status, created_date`,
       [email, full_name, phone || null, passwordHash, role || 'guest', document_type || null, document_number || null, company_name || null, address_info || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email ja cadastrado.' });
+    if (err.code === '23505') return sendUniqueUserConflict(res, err);
     sendServerError(res, err);
   }
 }
 
 export async function updateUser(req, res) {
   try {
-    const { full_name, phone, email, password, role, document_type, document_number, company_name, address_info } = req.body;
+    const { full_name, phone, email, password, role, document_type, document_number, company_name, address_info, account_status } = req.body;
     if (role && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Perfil invalido. Use: guest, host ou admin.' });
     }
+    if (account_status && !VALID_ACCOUNT_STATUSES.includes(account_status)) {
+      return res.status(400).json({ error: 'Status de conta invalido.' });
+    }
     if (isSelf(req, req.params.id) && role && role !== 'admin') {
       return res.status(400).json({ error: 'Voce nao pode remover o proprio perfil administrativo.' });
+    }
+    if (isSelf(req, req.params.id) && account_status === 'blocked') {
+      return res.status(400).json({ error: 'Voce nao pode bloquear a propria conta.' });
     }
 
     const existing = await pool.query('SELECT id FROM users WHERE id = $1', [req.params.id]);
@@ -575,7 +658,7 @@ export async function updateUser(req, res) {
 
     const updates = [];
     const params = [];
-    const fields = { full_name, phone, email, role, document_type, document_number, company_name, address_info };
+    const fields = { full_name, phone, email, role, document_type, document_number, company_name, address_info, account_status };
     for (const [field, value] of Object.entries(fields)) {
       if (value !== undefined) {
         params.push(value);
@@ -592,12 +675,12 @@ export async function updateUser(req, res) {
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')}, updated_date = NOW()
        WHERE id = $${params.length}
-       RETURNING id, email, full_name, phone, role, document_type, company_name, created_date`,
+       RETURNING id, email, full_name, phone, role, document_type, company_name, account_status, created_date`,
       params
     );
     res.json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Este email ja esta em uso.' });
+    if (err.code === '23505') return sendUniqueUserConflict(res, err, 'Este email ja esta em uso.');
     sendServerError(res, err);
   }
 }
@@ -608,16 +691,30 @@ export async function deleteUser(req, res) {
       return res.status(400).json({ error: 'Voce nao pode deletar sua propria conta.' });
     }
 
-    const activeReservations = await pool.query(
-      `SELECT
-        (SELECT COUNT(*) FROM reservations WHERE guest_id = $1 AND status IN ('pending', 'confirmed')) +
-        (SELECT COUNT(*) FROM reservations r JOIN properties p ON r.property_id = p.id
-          WHERE p.created_by = $1 AND r.status IN ('pending', 'confirmed')) AS count`,
+    const activeGuestReservations = await pool.query(
+      `SELECT COUNT(*) FROM reservations
+       WHERE guest_id = $1
+         AND status IN ('pending', 'approved', 'confirmed')`,
       [req.params.id]
     );
 
-    if (Number(activeReservations.rows[0].count) > 0) {
-      return res.status(400).json({ error: 'Nao e possivel remover usuario com reservas ativas.' });
+    if (Number(activeGuestReservations.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: 'Nao e possivel remover este hospede porque ele possui reserva pendente, aprovada ou confirmada. Cancele ou conclua as reservas antes de remover o usuario.',
+        code: 'USER_HAS_ACTIVE_GUEST_RESERVATIONS',
+      });
+    }
+
+    const ownedProperties = await pool.query(
+      'SELECT COUNT(*) FROM properties WHERE created_by = $1',
+      [req.params.id]
+    );
+
+    if (Number(ownedProperties.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: 'Nao e possivel remover este usuario porque ele possui imoveis cadastrados. Desative, transfira ou remova os imoveis antes de remover o usuario.',
+        code: 'USER_HAS_PROPERTIES',
+      });
     }
 
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);

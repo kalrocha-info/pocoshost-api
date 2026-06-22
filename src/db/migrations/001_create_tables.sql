@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS reservations (
   total_price NUMERIC(10, 2) NOT NULL,
   platform_fee NUMERIC(10, 2) NOT NULL,
   host_net NUMERIC(10, 2) NOT NULL,
-  status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','completed')),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','confirmed','cancelled','completed')),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 minutes'),
+  expired_at TIMESTAMPTZ,
   created_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_date TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -122,9 +124,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_payment_id_idx
 CREATE UNIQUE INDEX IF NOT EXISTS payments_reservation_id_idx
   ON payments(reservation_id);
 
+-- Prazo de retenção temporária da agenda enquanto o pagamento não é concluído
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_status_check;
+ALTER TABLE reservations
+  ADD CONSTRAINT reservations_status_check
+  CHECK (status IN ('pending','approved','confirmed','cancelled','completed'));
+UPDATE reservations
+   SET expires_at = created_date + INTERVAL '30 minutes'
+ WHERE expires_at IS NULL;
+ALTER TABLE reservations ALTER COLUMN expires_at SET DEFAULT (NOW() + INTERVAL '30 minutes');
+ALTER TABLE reservations ALTER COLUMN expires_at SET NOT NULL;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS expired_at TIMESTAMPTZ;
+UPDATE reservations
+   SET status = 'cancelled',
+       expired_at = COALESCE(expired_at, NOW()),
+       updated_date = NOW()
+ WHERE status IN ('pending', 'approved')
+   AND expires_at <= NOW();
+CREATE INDEX IF NOT EXISTS reservations_pending_expiration_idx
+  ON reservations(expires_at)
+  WHERE status IN ('pending', 'approved');
+
 -- Campos LGPD para anonimização de contas
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_anonymized BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'active';
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_account_status_check;
+ALTER TABLE users
+  ADD CONSTRAINT users_account_status_check
+  CHECK (account_status IN ('active', 'blocked'));
+CREATE UNIQUE INDEX IF NOT EXISTS users_document_number_active_unique_idx
+  ON users ((regexp_replace(document_number, '\D', '', 'g')))
+  WHERE document_number IS NOT NULL
+    AND regexp_replace(document_number, '\D', '', 'g') <> ''
+    AND is_anonymized = FALSE;
 
 -- Campos de verificação de e-mail
 -- Contas existentes antes desta migration são preservadas como verificadas;
@@ -142,3 +176,15 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPT
 CREATE INDEX IF NOT EXISTS users_email_verification_token_hash_idx
   ON users(email_verification_token_hash)
   WHERE email_verification_token_hash IS NOT NULL;
+UPDATE users
+   SET email_verified = TRUE,
+       email_verified_at = COALESCE(email_verified_at, created_date, NOW()),
+       updated_date = NOW()
+ WHERE role = 'admin'
+   AND email_verified = FALSE
+   AND is_anonymized = FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_hash VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_sent_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS users_password_reset_token_hash_idx
+  ON users(password_reset_token_hash)
+  WHERE password_reset_token_hash IS NOT NULL;

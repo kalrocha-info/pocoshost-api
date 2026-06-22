@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    include: ['src/tests/**/*.test.js'],
+    exclude: ['**/node_modules/**', '**/_deploy_*/**', '**/dist/**'],
     setupFiles: [
       './src/tests/helpers/mockAsaas.js',
       './src/tests/helpers/mockEmail.js',
