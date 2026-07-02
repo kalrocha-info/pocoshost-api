@@ -143,4 +143,46 @@ export const schemas = {
       errorMap: () => ({ message: 'Status deve ser: approved, cancelled ou completed' }),
     }),
   }),
+
+  crmContact: z.object({
+    user_id: z.string().uuid('user_id deve ser um UUID válido').optional().nullable(),
+    full_name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(255),
+    email: z.string().trim().email('Email inválido').max(255).optional().nullable(),
+    phone: z.string().trim().max(50).optional().nullable(),
+    contact_type: z.enum(['guest', 'host', 'partner']).optional().default('guest'),
+    stage: z.enum(['lead', 'contacted', 'qualified', 'onboarding', 'active', 'inactive'])
+      .optional()
+      .default('lead'),
+    source: z.string().trim().max(100).optional().nullable(),
+    summary: z.string().trim().max(2000).optional().nullable(),
+    assigned_to: z.string().uuid('assigned_to deve ser um UUID válido').optional().nullable(),
+    next_action_at: z.string().datetime({ offset: true }).optional().nullable(),
+  }),
+
+  crmContactUpdate: z.object({
+    full_name: z.string().trim().min(2).max(255).optional(),
+    email: z.string().trim().email('Email inválido').max(255).optional().nullable(),
+    phone: z.string().trim().max(50).optional().nullable(),
+    contact_type: z.enum(['guest', 'host', 'partner']).optional(),
+    stage: z.enum(['lead', 'contacted', 'qualified', 'onboarding', 'active', 'inactive'])
+      .optional(),
+    source: z.string().trim().max(100).optional().nullable(),
+    summary: z.string().trim().max(2000).optional().nullable(),
+    assigned_to: z.string().uuid('assigned_to deve ser um UUID válido').optional().nullable(),
+    next_action_at: z.string().datetime({ offset: true }).optional().nullable(),
+  }).refine(data => Object.keys(data).length > 0, {
+    message: 'Nenhum campo para atualizar.',
+  }),
+
+  crmActivity: z.object({
+    activity_type: z.enum(['note', 'call', 'email', 'meeting', 'task'])
+      .optional()
+      .default('note'),
+    content: z.string().trim().min(1, 'Descrição obrigatória').max(3000),
+    due_at: z.string().datetime({ offset: true }).optional().nullable(),
+  }),
+
+  crmActivityUpdate: z.object({
+    completed: z.boolean(),
+  }),
 };

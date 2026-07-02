@@ -21,6 +21,16 @@ import {
   updateUser,
   deleteUser,
 } from '../controllers/adminController.js';
+import {
+  listContacts,
+  getContact,
+  createContact,
+  updateContact,
+  deleteContact,
+  createActivity,
+  updateActivity,
+} from '../controllers/crmController.js';
+import { validate, schemas } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -31,6 +41,21 @@ router.use(authRequired, adminRequired);
 // Dashboard
 // ============================================
 router.get('/stats', getStats);
+
+// ============================================
+// CRM leve
+// ============================================
+router.get('/crm/contacts', listContacts);
+router.get('/crm/contacts/:id', getContact);
+router.post('/crm/contacts', validate(schemas.crmContact), createContact);
+router.put('/crm/contacts/:id', validate(schemas.crmContactUpdate), updateContact);
+router.delete('/crm/contacts/:id', deleteContact);
+router.post('/crm/contacts/:id/activities', validate(schemas.crmActivity), createActivity);
+router.patch(
+  '/crm/activities/:activityId',
+  validate(schemas.crmActivityUpdate),
+  updateActivity
+);
 
 // ============================================
 // Hosts (Anfitriões)
