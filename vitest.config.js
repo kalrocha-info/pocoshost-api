@@ -8,6 +8,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/_deploy_*/**', '**/dist/**'],
     setupFiles: [
       './src/tests/helpers/mockAsaas.js',
+      './src/tests/helpers/mockCloudinary.js',
       './src/tests/helpers/mockEmail.js',
       './src/tests/helpers/setup.js',
     ],
@@ -19,7 +20,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/controllers/**', 'src/middleware/**'],
+      include: ['src/controllers/**/*.js', 'src/middleware/**/*.js'],
       thresholds: { lines: 80, functions: 80, branches: 70 },
     },
   },

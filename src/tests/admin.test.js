@@ -285,4 +285,151 @@ describe('ADMIN — /api/admin', () => {
     expect(paymentsRes.body.payments[0].amount).toBeDefined();
     expect(paymentsRes.body.payments[0].created_at).toBeDefined();
   });
+
+  it('executa o ciclo administrativo completo de um anfitriao sem imoveis', async () => {
+    const admin = await createAdmin();
+    const created = await request(app)
+      .post('/api/admin/hosts')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        full_name: 'Host CRUD Admin',
+        email: 'host-crud-admin@example.test',
+        password: 'senha123',
+        phone: '00000000000',
+        asaas_wallet_id: 'wal_admin_crud',
+      });
+
+    expect(created.status).toBe(201);
+    expect(created.body.role).toBe('host');
+
+    const listed = await request(app)
+      .get('/api/admin/hosts?search=host-crud-admin')
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body.hosts).toHaveLength(1);
+
+    const detail = await request(app)
+      .get(`/api/admin/hosts/${created.body.id}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.properties).toEqual([]);
+
+    const updated = await request(app)
+      .put(`/api/admin/hosts/${created.body.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        full_name: 'Host CRUD Atualizado',
+        account_status: 'blocked',
+        asaas_wallet_id: '',
+      });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({
+      full_name: 'Host CRUD Atualizado',
+      account_status: 'blocked',
+      asaas_wallet_id: null,
+    });
+
+    const removed = await request(app)
+      .delete(`/api/admin/hosts/${created.body.id}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(removed.status).toBe(204);
+  });
+
+  it('executa o ciclo administrativo de um imovel sem reservas', async () => {
+    const admin = await createAdmin();
+    const host = await createUser({ role: 'host', email: 'host-property-crud@example.test' });
+    const created = await request(app)
+      .post('/api/admin/properties')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        owner_id: host.user.id,
+        title: 'Imovel CRUD Admin',
+        description: 'Imovel criado pelo painel',
+        city: 'Poços de Caldas',
+        state: 'MG',
+        price_per_night: 250,
+        category_slug: 'casa',
+        amenities: ['wifi'],
+        status: 'active',
+      });
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      owner_id: host.user.id,
+      title: 'Imovel CRUD Admin',
+      status: 'active',
+    });
+
+    const updated = await request(app)
+      .put(`/api/admin/properties/${created.body.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ title: 'Imovel CRUD Atualizado', status: 'inactive' });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({
+      title: 'Imovel CRUD Atualizado',
+      status: 'inactive',
+    });
+
+    const removed = await request(app)
+      .delete(`/api/admin/properties/${created.body.id}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(removed.status).toBe(204);
+  });
+
+  it('atualiza reserva e consulta estatisticas financeiras com filtros', async () => {
+    const admin = await createAdmin();
+    const host = await createUser({ role: 'host', email: 'host-reservation-update@example.test' });
+    const guest = await createUser({ email: 'guest-reservation-update@example.test' });
+    const property = await createProperty(host.token, { title: 'Imovel Status Admin' });
+    const reservation = await createReservation(guest.token, property.id);
+
+    const approved = await request(app)
+      .put(`/api/admin/reservations/${reservation.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ status: 'approved' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe('approved');
+    expect(approved.body.expires_at).toBeDefined();
+
+    const invalid = await request(app)
+      .put(`/api/admin/reservations/${reservation.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ status: 'invalid' });
+    expect(invalid.status).toBe(400);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const stats = await request(app)
+      .get(`/api/admin/payments/stats?from_date=${today}&to_date=${today}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(stats.status).toBe(200);
+    expect(stats.body.total_payments).toBeDefined();
+  });
+
+  it('consulta e atualiza um usuario pelo painel', async () => {
+    const admin = await createAdmin();
+    const guest = await createUser({ email: 'guest-user-crud@example.test' });
+
+    const detail = await request(app)
+      .get(`/api/admin/users/${guest.user.id}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.document_number).toBeUndefined();
+
+    const updated = await request(app)
+      .put(`/api/admin/users/${guest.user.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        full_name: 'Guest Atualizado',
+        phone: '00000000000',
+        password: 'novaSenha123',
+      });
+    expect(updated.status).toBe(200);
+    expect(updated.body.full_name).toBe('Guest Atualizado');
+
+    const emptyUpdate = await request(app)
+      .put(`/api/admin/users/${guest.user.id}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({});
+    expect(emptyUpdate.status).toBe(400);
+  });
 });

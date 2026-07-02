@@ -1,10 +1,7 @@
 import 'dotenv/config';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import pg from 'pg';
+import { runMigrations } from '../../db/migrate.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
 
 export const testPool = new Pool({
@@ -31,10 +28,7 @@ async function seedCategories() {
 
 // Criar tabelas na DB de teste antes de todos os testes
 beforeAll(async () => {
-  const sql = readFileSync(
-    path.join(__dirname, '../../db/migrations/001_create_tables.sql'), 'utf8'
-  );
-  await testPool.query(sql);
+  await runMigrations();
   await seedCategories();
 });
 

@@ -10,7 +10,9 @@ import favoritesRoutes from './routes/favorites.js';
 import categoriesRoutes from './routes/categories.js';
 import adminRoutes from './routes/admin.js';
 import webhooksRoutes from './routes/webhooks.js';
+import uploadRoutes from './routes/upload.js';
 import monitoringRoutes from './routes/monitoring.js';
+import { sendServerError } from './utils/http.js';
 
 export function createApp() {
   const app = express();
@@ -26,6 +28,8 @@ export function createApp() {
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/webhooks', webhooksRoutes);
+  app.use('/api/upload', uploadRoutes);
   app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
+  app.use((err, req, res, next) => sendServerError(res, err));
   return app;
 }

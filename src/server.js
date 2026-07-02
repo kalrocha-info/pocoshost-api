@@ -133,6 +133,8 @@ async function startServer() {
     logger.info('database_migrations_completed');
   } catch (err) {
     logger.error('database_migrations_failed', { message: err.message });
+    process.exitCode = 1;
+    return;
   }
 
   app.listen(PORT, '0.0.0.0', () => {
