@@ -15,6 +15,34 @@ function futureDate(n) {
 
 describe('PAYMENTS — /api/payments', () => {
   describe('POST / — criar pagamento', () => {
+    it('bloqueia novos pagamentos quando a funcionalidade está desativada', async () => {
+      const previousValue = process.env.PAYMENTS_ENABLED;
+      process.env.PAYMENTS_ENABLED = 'false';
+
+      try {
+        const response = await request(app)
+          .post('/api/payments')
+          .set('Authorization', 'Bearer token-invalido')
+          .send({});
+
+        expect(response.status).toBe(401);
+
+        const guest = await createUser({ email: 'payments-disabled@example.test' });
+        const disabledResponse = await request(app)
+          .post('/api/payments')
+          .set('Authorization', `Bearer ${guest.token}`)
+          .send({});
+
+        expect(disabledResponse.status).toBe(503);
+        expect(disabledResponse.body).toEqual({
+          error: 'Pagamentos temporariamente indisponíveis.',
+          code: 'PAYMENTS_DISABLED',
+        });
+      } finally {
+        process.env.PAYMENTS_ENABLED = previousValue;
+      }
+    });
+
     it('cria pagamento e confirma reserva automaticamente', async () => {
       const host = await createUser({ email: 'ph@example.test' });
       const guest = await createUser({ email: 'pg@example.test' });
