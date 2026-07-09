@@ -59,7 +59,7 @@ describe('CRM — /api/admin/crm', () => {
           user_id: host.user.id,
           full_name: 'Anfitrião Sincronizado',
           contact_type: 'host',
-          stage: 'active',
+          stage: 'onboarding',
           source: 'platform',
         }),
       ])

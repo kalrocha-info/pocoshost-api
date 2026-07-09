@@ -21,6 +21,7 @@ import webhooksRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/upload.js';
 import monitoringRoutes from './routes/monitoring.js';
+import leadsRoutes from './routes/leads.js';
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/leads', leadsRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/reservations', reservationsRoutes);
 app.use('/api/payments', paymentsRoutes);

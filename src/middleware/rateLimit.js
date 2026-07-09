@@ -19,3 +19,12 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Demasiadas tentativas de autenticação. Tente novamente em 15 minutos.' },
 });
+
+export const leadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skip: skipInTests,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas solicitações. Aguarde alguns minutos antes de tentar novamente.' },
+});

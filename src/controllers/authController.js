@@ -69,7 +69,10 @@ async function issuePasswordResetEmail(user, client = pool) {
 }
 
 export async function register(req, res) {
-  const { full_name, email, password, role, document_type, document_number, company_name, address_info } = req.body;
+  const {
+    full_name, email, password, role, document_type, document_number, company_name, address_info,
+    utm_source, utm_medium, utm_campaign, utm_content, utm_term, landing_page, referrer,
+  } = req.body;
   if (!full_name || !email || !password)
     return res.status(400).json({ error: 'full_name, email e password são obrigatórios.' });
 
@@ -106,6 +109,28 @@ export async function register(req, res) {
       [full_name, email, password_hash, assignedRole, document_type, normalizedDocument, company_name, address_info]
     );
     const user = result.rows[0];
+    await pool.query(
+      `UPDATE crm_contacts
+          SET utm_source = COALESCE($1, utm_source),
+              utm_medium = COALESCE($2, utm_medium),
+              utm_campaign = COALESCE($3, utm_campaign),
+              utm_content = COALESCE($4, utm_content),
+              utm_term = COALESCE($5, utm_term),
+              landing_page = COALESCE($6, landing_page),
+              referrer = COALESCE($7, referrer),
+              updated_date = NOW()
+        WHERE user_id = $8`,
+      [
+        utm_source ?? null,
+        utm_medium ?? null,
+        utm_campaign ?? null,
+        utm_content ?? null,
+        utm_term ?? null,
+        landing_page ?? null,
+        referrer ?? null,
+        user.id,
+      ]
+    );
     await issueVerificationEmail(user);
     res.status(201).json({
       success: true,

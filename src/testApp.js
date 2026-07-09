@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin.js';
 import webhooksRoutes from './routes/webhooks.js';
 import uploadRoutes from './routes/upload.js';
 import monitoringRoutes from './routes/monitoring.js';
+import leadsRoutes from './routes/leads.js';
 import { sendServerError } from './utils/http.js';
 
 export function createApp() {
@@ -20,6 +21,7 @@ export function createApp() {
   app.use(express.json());
   app.use('/api', monitoringRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/leads', leadsRoutes);
   app.use('/api/properties', propertiesRoutes);
   app.use('/api/reservations', reservationsRoutes);
   app.use('/api/payments', paymentsRoutes);

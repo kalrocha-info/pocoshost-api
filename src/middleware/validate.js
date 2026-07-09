@@ -31,6 +31,13 @@ export const schemas = {
     document_number: z.string().optional(),
     company_name: z.string().optional(),
     address_info: z.string().optional(),
+    utm_source: z.string().trim().max(150).optional().nullable(),
+    utm_medium: z.string().trim().max(150).optional().nullable(),
+    utm_campaign: z.string().trim().max(200).optional().nullable(),
+    utm_content: z.string().trim().max(200).optional().nullable(),
+    utm_term: z.string().trim().max(200).optional().nullable(),
+    landing_page: z.string().trim().max(2000).optional().nullable(),
+    referrer: z.string().trim().max(2000).optional().nullable(),
   }),
 
   login: z.object({
@@ -184,5 +191,41 @@ export const schemas = {
 
   crmActivityUpdate: z.object({
     completed: z.boolean(),
+  }),
+
+  hostLead: z.object({
+    full_name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(255),
+    email: z.string().trim().email('Email inválido').max(255).optional().nullable(),
+    phone: z.string().trim().min(8, 'Telefone inválido').max(50).optional().nullable(),
+    property_type: z.enum(['casa', 'apartamento', 'chale', 'pousada', 'sitio', 'hotel', 'outro']),
+    city: z.string().trim().min(2, 'Cidade obrigatória').max(150),
+    neighborhood: z.string().trim().max(150).optional().nullable(),
+    bedrooms: z.coerce.number().int().min(0).max(20).optional().nullable(),
+    management_interest: z.enum(['complete_management', 'direct_listing', 'maintenance_only', 'unsure'])
+      .optional()
+      .default('complete_management'),
+    property_status: z.enum(['ready', 'needs_adjustments', 'under_renovation', 'planning', 'unknown'])
+      .optional()
+      .default('unknown'),
+    accepts_maintenance_coordination: z.boolean().optional().default(false),
+    notes: z.string().trim().max(1000).optional().nullable(),
+    privacy_accepted: z.literal(true, {
+      errorMap: () => ({ message: 'É necessário aceitar a Política de Privacidade' }),
+    }),
+    contact_consent: z.literal(true, {
+      errorMap: () => ({ message: 'É necessário autorizar o contato sobre a solicitação' }),
+    }),
+    marketing_consent: z.boolean().optional().default(false),
+    utm_source: z.string().trim().max(150).optional().nullable(),
+    utm_medium: z.string().trim().max(150).optional().nullable(),
+    utm_campaign: z.string().trim().max(200).optional().nullable(),
+    utm_content: z.string().trim().max(200).optional().nullable(),
+    utm_term: z.string().trim().max(200).optional().nullable(),
+    landing_page: z.string().trim().max(2000).optional().nullable(),
+    referrer: z.string().trim().max(2000).optional().nullable(),
+    website: z.string().max(200).optional().default(''),
+  }).refine(data => Boolean(data.email || data.phone), {
+    message: 'Informe pelo menos e-mail ou telefone.',
+    path: ['phone'],
   }),
 };
