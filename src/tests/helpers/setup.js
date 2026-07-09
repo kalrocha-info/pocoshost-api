@@ -35,7 +35,17 @@ beforeAll(async () => {
 // Limpar todas as tabelas entre cada ficheiro de teste (ordem respeita FK)
 afterEach(async () => {
   await testPool.query(`
-    TRUNCATE TABLE reviews, payments, favorites, reservations, properties, users, property_categories
+    TRUNCATE TABLE
+      maintenance_order_photos,
+      maintenance_orders,
+      service_providers,
+      reviews,
+      payments,
+      favorites,
+      reservations,
+      properties,
+      users,
+      property_categories
     RESTART IDENTITY CASCADE
   `);
   await seedCategories();

@@ -30,6 +30,12 @@ import {
   createActivity,
   updateActivity,
 } from '../controllers/crmController.js';
+import {
+  listContactMaintenanceOrders,
+  createContactMaintenanceOrder,
+  updateMaintenanceOrder,
+  createMaintenanceOrderPhoto,
+} from '../controllers/maintenanceController.js';
 import { validate, schemas } from '../middleware/validate.js';
 
 const router = Router();
@@ -51,10 +57,26 @@ router.post('/crm/contacts', validate(schemas.crmContact), createContact);
 router.put('/crm/contacts/:id', validate(schemas.crmContactUpdate), updateContact);
 router.delete('/crm/contacts/:id', deleteContact);
 router.post('/crm/contacts/:id/activities', validate(schemas.crmActivity), createActivity);
+router.get('/crm/contacts/:id/maintenance-orders', listContactMaintenanceOrders);
+router.post(
+  '/crm/contacts/:id/maintenance-orders',
+  validate(schemas.maintenanceOrder),
+  createContactMaintenanceOrder
+);
 router.patch(
   '/crm/activities/:activityId',
   validate(schemas.crmActivityUpdate),
   updateActivity
+);
+router.patch(
+  '/maintenance-orders/:orderId',
+  validate(schemas.maintenanceOrderUpdate),
+  updateMaintenanceOrder
+);
+router.post(
+  '/maintenance-orders/:orderId/photos',
+  validate(schemas.maintenancePhoto),
+  createMaintenanceOrderPhoto
 );
 
 // ============================================

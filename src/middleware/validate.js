@@ -193,6 +193,46 @@ export const schemas = {
     completed: z.boolean(),
   }),
 
+  maintenanceOrder: z.object({
+    property_id: z.string().uuid('property_id deve ser um UUID válido').optional().nullable(),
+    service_provider_id: z.string().uuid('service_provider_id deve ser um UUID válido').optional().nullable(),
+    title: z.string().trim().min(3, 'Título deve ter pelo menos 3 caracteres').max(255),
+    service_type: z.enum(['inspection', 'cleaning', 'repair', 'renovation', 'setup', 'other'])
+      .optional()
+      .default('other'),
+    status: z.enum(['requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'done', 'cancelled'])
+      .optional()
+      .default('requested'),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).optional().default('normal'),
+    description: z.string().trim().max(3000).optional().nullable(),
+    provider_amount: z.coerce.number().nonnegative().optional().nullable(),
+    coordination_fee: z.coerce.number().nonnegative().optional().nullable(),
+    scheduled_for: z.string().datetime({ offset: true }).optional().nullable(),
+  }),
+
+  maintenanceOrderUpdate: z.object({
+    property_id: z.string().uuid('property_id deve ser um UUID válido').optional().nullable(),
+    service_provider_id: z.string().uuid('service_provider_id deve ser um UUID válido').optional().nullable(),
+    title: z.string().trim().min(3).max(255).optional(),
+    service_type: z.enum(['inspection', 'cleaning', 'repair', 'renovation', 'setup', 'other']).optional(),
+    status: z.enum(['requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'done', 'cancelled'])
+      .optional(),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+    description: z.string().trim().max(3000).optional().nullable(),
+    provider_amount: z.coerce.number().nonnegative().optional().nullable(),
+    coordination_fee: z.coerce.number().nonnegative().optional().nullable(),
+    scheduled_for: z.string().datetime({ offset: true }).optional().nullable(),
+    completed_at: z.string().datetime({ offset: true }).optional().nullable(),
+  }).refine(data => Object.keys(data).length > 0, {
+    message: 'Nenhum campo para atualizar.',
+  }),
+
+  maintenancePhoto: z.object({
+    photo_type: z.enum(['before', 'after', 'receipt', 'other']).optional().default('other'),
+    url: z.string().trim().url('URL inválida').max(2000),
+    caption: z.string().trim().max(500).optional().nullable(),
+  }),
+
   hostLead: z.object({
     full_name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(255),
     email: z.string().trim().email('Email inválido').max(255).optional().nullable(),
