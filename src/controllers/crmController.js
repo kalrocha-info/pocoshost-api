@@ -8,8 +8,10 @@ const CONTACT_SELECT = `
     COALESCE(activity_stats.activity_count, 0)::int AS activity_count,
     activity_stats.last_activity_at,
     COALESCE(user_stats.reservations_count, 0)::int AS reservations_count,
-    COALESCE(user_stats.properties_count, 0)::int AS properties_count
+    COALESCE(user_stats.properties_count, 0)::int AS properties_count,
+    row_to_json(hp) AS host_lead_profile
   FROM crm_contacts c
+  LEFT JOIN host_lead_profiles hp ON hp.contact_id = c.id
   LEFT JOIN users assigned ON assigned.id = c.assigned_to
   LEFT JOIN LATERAL (
     SELECT

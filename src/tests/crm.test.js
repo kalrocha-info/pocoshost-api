@@ -138,6 +138,15 @@ describe('CRM — /api/admin/crm', () => {
       .post('/api/admin/crm/contacts')
       .set(auth(admin.token))
       .send({ full_name: 'Contacto com Histórico', contact_type: 'host' });
+    await pool.query(
+      `INSERT INTO host_lead_profiles (
+         contact_id, property_type, city, neighborhood, bedrooms,
+         management_interest, property_status, accepts_maintenance_coordination
+       )
+       VALUES ($1, 'apartamento', 'Poços de Caldas', 'Centro', 2,
+               'complete_management', 'ready', TRUE)`,
+      [created.body.id]
+    );
 
     const activity = await request(app)
       .post(`/api/admin/crm/contacts/${created.body.id}/activities`)
@@ -156,6 +165,17 @@ describe('CRM — /api/admin/crm', () => {
 
     expect(detail.status).toBe(200);
     expect(detail.body.last_contact_at).toBeTruthy();
+    expect(detail.body.host_lead_profile).toEqual(
+      expect.objectContaining({
+        property_type: 'apartamento',
+        city: 'Poços de Caldas',
+        neighborhood: 'Centro',
+        bedrooms: 2,
+        management_interest: 'complete_management',
+        property_status: 'ready',
+        accepts_maintenance_coordination: true,
+      })
+    );
     expect(detail.body.activities).toEqual([
       expect.objectContaining({
         content: 'Apresentação da plataforma realizada.',
