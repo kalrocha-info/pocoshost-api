@@ -1,19 +1,19 @@
-import nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer'
 
-let transporter = null;
+let transporter = null
 
-function getTransporter() {
-  if (transporter) return transporter;
+function getTransporter () {
+  if (transporter) return transporter
 
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT;
-  const secure = process.env.SMTP_SECURE === 'true';
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const host = process.env.SMTP_HOST
+  const port = process.env.SMTP_PORT
+  const secure = process.env.SMTP_SECURE === 'true'
+  const user = process.env.SMTP_USER
+  const pass = process.env.SMTP_PASS
 
   if (!host || !user || !pass) {
-    console.warn('[EmailService] SMTP ausente; e-mails transacionais serao apenas registrados sem conteudo pessoal.');
-    return null;
+    console.warn('[EmailService] SMTP ausente; e-mails transacionais serao apenas registrados sem conteudo pessoal.')
+    return null
   }
 
   transporter = nodemailer.createTransport({
@@ -22,24 +22,24 @@ function getTransporter() {
     secure,
     auth: {
       user,
-      pass,
-    },
-  });
+      pass
+    }
+  })
 
-  return transporter;
+  return transporter
 }
 
-export async function sendEmail({ to, subject, html, text }) {
-  const from = process.env.SMTP_FROM || 'PoçosHost <contato@pocoshost.com>';
-  const client = getTransporter();
+export async function sendEmail ({ to, subject, html, text }) {
+  const from = process.env.SMTP_FROM || 'PoçosHost <contato@pocoshost.com>'
+  const client = getTransporter()
 
   if (!client) {
     console.warn('[EmailService] SMTP ausente; e-mail transacional não enviado.', {
       toDomain: typeof to === 'string' ? to.split('@')[1] : undefined,
       subject,
-      from,
-    });
-    return { mock: true };
+      from
+    })
+    return { mock: true }
   }
 
   try {
@@ -48,42 +48,42 @@ export async function sendEmail({ to, subject, html, text }) {
       to,
       subject,
       text,
-      html,
-    });
-    console.log(`[EmailService] Email sent successfully: ${info.messageId}`);
-    return info;
+      html
+    })
+    console.log(`[EmailService] Email sent successfully: ${info.messageId}`)
+    return info
   } catch (error) {
-    console.error('[EmailService] Failed to send email:', error);
-    throw error;
+    console.error('[EmailService] Failed to send email:', error)
+    throw error
   }
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+function formatDate (dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
 
-  const parts = dateStr.toString().split('-');
+  const parts = dateStr.toString().split('-')
   if (parts.length === 3) {
-    return `${parts[2].substring(0, 2)}/${parts[1]}/${parts[0]}`;
+    return `${parts[2].substring(0, 2)}/${parts[1]}/${parts[0]}`
   }
 
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
 }
 
-function formatCurrency(value) {
-  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function formatCurrency (value) {
+  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-export async function sendReservationConfirmationToGuest(reservation) {
-  const checkInFormated = formatDate(reservation.check_in);
-  const checkOutFormated = formatDate(reservation.check_out);
-  const totalFormated = formatCurrency(reservation.total_price);
+export async function sendReservationConfirmationToGuest (reservation) {
+  const checkInFormated = formatDate(reservation.check_in)
+  const checkOutFormated = formatDate(reservation.check_out)
+  const totalFormated = formatCurrency(reservation.total_price)
 
-  const subject = `Pagamento Confirmado - Sua reserva em ${reservation.property_title} está garantida!`;
+  const subject = `Pagamento Confirmado - Sua reserva em ${reservation.property_title} está garantida!`
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5b251; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
@@ -133,7 +133,7 @@ export async function sendReservationConfirmationToGuest(reservation) {
         &copy; 2026 PoçosHost. Todos os direitos reservados.
       </div>
     </div>
-  `;
+  `
 
   const text = `
 Olá, ${reservation.guest_name}!
@@ -151,17 +151,17 @@ Verifique suas reservas em: https://www.pocoshost.com/reservas
 
 Atenciosamente,
 Equipe PoçosHost
-  `;
+  `
 
-  return sendEmail({ to: reservation.guest_email, subject, html, text });
+  return sendEmail({ to: reservation.guest_email, subject, html, text })
 }
 
-export async function sendReservationConfirmationToHost(reservation) {
-  const checkInFormated = formatDate(reservation.check_in);
-  const checkOutFormated = formatDate(reservation.check_out);
-  const hostNetFormated = formatCurrency(reservation.host_net);
+export async function sendReservationConfirmationToHost (reservation) {
+  const checkInFormated = formatDate(reservation.check_in)
+  const checkOutFormated = formatDate(reservation.check_out)
+  const hostNetFormated = formatCurrency(reservation.host_net)
 
-  const subject = `Nova Reserva Confirmada - ${reservation.property_title}`;
+  const subject = `Nova Reserva Confirmada - ${reservation.property_title}`
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5b251; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
@@ -215,7 +215,7 @@ export async function sendReservationConfirmationToHost(reservation) {
         &copy; 2026 PoçosHost. Todos os direitos reservados.
       </div>
     </div>
-  `;
+  `
 
   const text = `
 Olá!
@@ -234,15 +234,15 @@ Gerencie suas reservas em: https://www.pocoshost.com/painel/reservas
 
 Atenciosamente,
 Equipe PoçosHost
-  `;
+  `
 
-  return sendEmail({ to: reservation.host_email, subject, html, text });
+  return sendEmail({ to: reservation.host_email, subject, html, text })
 }
 
-export async function sendEmailVerification(user, token) {
-  const siteUrl = (process.env.FRONTEND_URL || process.env.SITE_URL || 'https://www.pocoshost.com').replace(/\/$/, '');
-  const verificationUrl = `${siteUrl}/verify-email?token=${encodeURIComponent(token)}`;
-  const subject = 'Confirme seu e-mail para ativar sua conta PoçosHost';
+export async function sendEmailVerification (user, token) {
+  const siteUrl = (process.env.FRONTEND_URL || process.env.SITE_URL || 'https://www.pocoshost.com').replace(/\/$/, '')
+  const verificationUrl = `${siteUrl}/verify-email?token=${encodeURIComponent(token)}`
+  const subject = 'Confirme seu e-mail para ativar sua conta PoçosHost'
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #222;">
       <h1 style="color: #111;">PoçosHost</h1>
@@ -257,21 +257,21 @@ export async function sendEmailVerification(user, token) {
       <p style="word-break: break-all; color: #555;">${verificationUrl}</p>
       <p>Se você não criou uma conta, ignore este e-mail.</p>
     </div>
-  `;
+  `
   const text = `Olá, ${user.full_name}.
 
 Recebemos seu cadastro na PoçosHost. Confirme seu e-mail acessando:
 ${verificationUrl}
 
-Se você não criou uma conta, ignore este e-mail.`;
+Se você não criou uma conta, ignore este e-mail.`
 
-  return sendEmail({ to: user.email, subject, html, text });
+  return sendEmail({ to: user.email, subject, html, text })
 }
 
-export async function sendPasswordReset(user, token) {
-  const siteUrl = (process.env.FRONTEND_URL || process.env.SITE_URL || 'https://www.pocoshost.com').replace(/\/$/, '');
-  const resetUrl = `${siteUrl}/reset-password?token=${encodeURIComponent(token)}`;
-  const subject = 'Redefina sua senha PoçosHost';
+export async function sendPasswordReset (user, token) {
+  const siteUrl = (process.env.FRONTEND_URL || process.env.SITE_URL || 'https://www.pocoshost.com').replace(/\/$/, '')
+  const resetUrl = `${siteUrl}/reset-password?token=${encodeURIComponent(token)}`
+  const subject = 'Redefina sua senha PoçosHost'
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #222;">
       <h1 style="color: #111;">PoçosHost</h1>
@@ -286,14 +286,14 @@ export async function sendPasswordReset(user, token) {
       <p style="word-break: break-all; color: #555;">${resetUrl}</p>
       <p>Se você não solicitou esta alteração, ignore este e-mail.</p>
     </div>
-  `;
+  `
   const text = `Olá, ${user.full_name}.
 
 Recebemos uma solicitação para redefinir a senha da sua conta PoçosHost.
 O link é válido por 1 hora:
 ${resetUrl}
 
-Se você não solicitou esta alteração, ignore este e-mail.`;
+Se você não solicitou esta alteração, ignore este e-mail.`
 
-  return sendEmail({ to: user.email, subject, html, text });
+  return sendEmail({ to: user.email, subject, html, text })
 }

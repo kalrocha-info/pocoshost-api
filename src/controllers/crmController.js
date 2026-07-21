@@ -1,5 +1,5 @@
-import { pool } from '../db/pool.js';
-import { assertUUID, sendServerError } from '../utils/http.js';
+import { pool } from '../db/pool.js'
+import { assertUUID, sendServerError } from '../utils/http.js'
 
 const CONTACT_SELECT = `
   SELECT
@@ -25,30 +25,30 @@ const CONTACT_SELECT = `
       (SELECT COUNT(*) FROM reservations WHERE guest_id = c.user_id) AS reservations_count,
       (SELECT COUNT(*) FROM properties WHERE created_by = c.user_id) AS properties_count
   ) user_stats ON c.user_id IS NOT NULL
-`;
+`
 
-export async function listContacts(req, res) {
+export async function listContacts (req, res) {
   try {
-    const { search, stage, contact_type: contactType } = req.query;
-    const filters = [];
-    const params = [];
+    const { search, stage, contact_type: contactType } = req.query
+    const filters = []
+    const params = []
 
     if (search) {
-      params.push(`%${search.trim()}%`);
+      params.push(`%${search.trim()}%`)
       filters.push(
         `(c.full_name ILIKE $${params.length} OR c.email ILIKE $${params.length} OR c.phone ILIKE $${params.length})`
-      );
+      )
     }
     if (stage) {
-      params.push(stage);
-      filters.push(`c.stage = $${params.length}`);
+      params.push(stage)
+      filters.push(`c.stage = $${params.length}`)
     }
     if (contactType) {
-      params.push(contactType);
-      filters.push(`c.contact_type = $${params.length}`);
+      params.push(contactType)
+      filters.push(`c.contact_type = $${params.length}`)
     }
 
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
     const contacts = await pool.query(
       `${CONTACT_SELECT}
        ${where}
@@ -58,7 +58,7 @@ export async function listContacts(req, res) {
          c.updated_date DESC
        LIMIT 200`,
       params
-    );
+    )
     const stats = await pool.query(`
       SELECT
         COUNT(*)::int AS total,
@@ -77,24 +77,24 @@ export async function listContacts(req, res) {
             AND stage <> 'inactive'
         )::int AS due_today
       FROM crm_contacts
-    `);
+    `)
 
-    return res.json({ contacts: contacts.rows, stats: stats.rows[0] });
+    return res.json({ contacts: contacts.rows, stats: stats.rows[0] })
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function getContact(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function getContact (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
   try {
     const contact = await pool.query(
       `${CONTACT_SELECT} WHERE c.id = $1`,
       [req.params.id]
-    );
+    )
     if (!contact.rows[0]) {
-      return res.status(404).json({ error: 'Contacto não encontrado.' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' })
     }
 
     const activities = await pool.query(
@@ -106,15 +106,15 @@ export async function getContact(req, res) {
        WHERE a.contact_id = $1
        ORDER BY a.created_date DESC`,
       [req.params.id]
-    );
+    )
 
-    return res.json({ ...contact.rows[0], activities: activities.rows });
+    return res.json({ ...contact.rows[0], activities: activities.rows })
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function createContact(req, res) {
+export async function createContact (req, res) {
   try {
     const {
       user_id: userId,
@@ -126,8 +126,8 @@ export async function createContact(req, res) {
       source,
       summary,
       assigned_to: assignedTo,
-      next_action_at: nextActionAt,
-    } = req.body;
+      next_action_at: nextActionAt
+    } = req.body
 
     const result = await pool.query(
       `INSERT INTO crm_contacts (
@@ -146,21 +146,21 @@ export async function createContact(req, res) {
         source ?? null,
         summary ?? null,
         assignedTo ?? req.user.id,
-        nextActionAt ?? null,
+        nextActionAt ?? null
       ]
-    );
+    )
 
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json(result.rows[0])
   } catch (err) {
     if (err.constraint === 'crm_contacts_user_id_key') {
-      return res.status(409).json({ error: 'Este utilizador já possui contacto no CRM.' });
+      return res.status(409).json({ error: 'Este utilizador já possui contacto no CRM.' })
     }
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function updateContact(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function updateContact (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
   try {
     const fields = {
@@ -172,70 +172,70 @@ export async function updateContact(req, res) {
       source: req.body.source,
       summary: req.body.summary,
       assigned_to: req.body.assigned_to,
-      next_action_at: req.body.next_action_at,
-    };
-    const updates = [];
-    const params = [];
+      next_action_at: req.body.next_action_at
+    }
+    const updates = []
+    const params = []
 
     for (const [field, value] of Object.entries(fields)) {
       if (value !== undefined) {
-        params.push(value);
-        updates.push(`${field} = $${params.length}`);
+        params.push(value)
+        updates.push(`${field} = $${params.length}`)
       }
     }
 
-    params.push(req.params.id);
+    params.push(req.params.id)
     const result = await pool.query(
       `UPDATE crm_contacts
        SET ${updates.join(', ')}, updated_date = NOW()
        WHERE id = $${params.length}
        RETURNING *`,
       params
-    );
+    )
     if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Contacto não encontrado.' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' })
     }
 
-    return res.json(result.rows[0]);
+    return res.json(result.rows[0])
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function deleteContact(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function deleteContact (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
   try {
     const result = await pool.query(
       'DELETE FROM crm_contacts WHERE id = $1 RETURNING id',
       [req.params.id]
-    );
+    )
     if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Contacto não encontrado.' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' })
     }
 
-    return res.status(204).send();
+    return res.status(204).send()
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function createActivity(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function createActivity (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
-  const client = await pool.connect();
+  const client = await pool.connect()
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN')
     const contact = await client.query(
       'SELECT id FROM crm_contacts WHERE id = $1 FOR UPDATE',
       [req.params.id]
-    );
+    )
     if (!contact.rows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Contacto não encontrado.' });
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Contacto não encontrado.' })
     }
 
-    const { activity_type: activityType, content, due_at: dueAt } = req.body;
+    const { activity_type: activityType, content, due_at: dueAt } = req.body
     const activity = await client.query(
       `INSERT INTO crm_activities (
          contact_id, author_id, activity_type, content, due_at
@@ -243,30 +243,30 @@ export async function createActivity(req, res) {
        VALUES ($1,$2,$3,$4,$5)
        RETURNING *`,
       [req.params.id, req.user.id, activityType, content, dueAt ?? null]
-    );
+    )
     const updates = activityType === 'task'
       ? 'updated_date = NOW()'
-      : 'last_contact_at = NOW(), updated_date = NOW()';
+      : 'last_contact_at = NOW(), updated_date = NOW()'
     await client.query(
       `UPDATE crm_contacts SET ${updates} WHERE id = $1`,
       [req.params.id]
-    );
-    await client.query('COMMIT');
+    )
+    await client.query('COMMIT')
 
-    return res.status(201).json(activity.rows[0]);
+    return res.status(201).json(activity.rows[0])
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    return sendServerError(res, err);
+    await client.query('ROLLBACK').catch(() => {})
+    return sendServerError(res, err)
   } finally {
-    client.release();
+    client.release()
   }
 }
 
-export async function updateActivity(req, res) {
-  if (!assertUUID(res, req.params.activityId, 'activityId')) return;
+export async function updateActivity (req, res) {
+  if (!assertUUID(res, req.params.activityId, 'activityId')) return
 
   try {
-    const { completed } = req.body;
+    const { completed } = req.body
     const result = await pool.query(
       `UPDATE crm_activities
        SET completed_at = CASE WHEN $1 THEN COALESCE(completed_at, NOW()) ELSE NULL END,
@@ -274,13 +274,13 @@ export async function updateActivity(req, res) {
        WHERE id = $2
        RETURNING *`,
       [completed, req.params.activityId]
-    );
+    )
     if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Atividade não encontrada.' });
+      return res.status(404).json({ error: 'Atividade não encontrada.' })
     }
 
-    return res.json(result.rows[0]);
+    return res.json(result.rows[0])
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }

@@ -1,251 +1,250 @@
-import request from 'supertest';
-import { createApp } from '../testApp.js';
-import { createUser, createProperty, createReservation } from './helpers/factories.js';
-import { pool } from '../db/pool.js';
+import request from 'supertest'
+import { createApp } from '../testApp.js'
+import { createUser, createProperty, createReservation } from './helpers/factories.js'
+import { pool } from '../db/pool.js'
 
-const app = createApp();
+const app = createApp()
 
-function futureDate(daysFromNow) {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  return d.toISOString().split('T')[0];
+function futureDate (daysFromNow) {
+  const d = new Date()
+  d.setDate(d.getDate() + daysFromNow)
+  return d.toISOString().split('T')[0]
 }
 
 describe('RESERVATIONS — /api/reservations', () => {
-
   describe('POST / — criação', () => {
     it('cria reserva com dados válidos', async () => {
-      const host = await createUser({ email: 'host@example.test' });
-      const guest = await createUser({ email: 'guest@example.test' });
-      const prop = await createProperty(host.token);
+      const host = await createUser({ email: 'host@example.test' })
+      const guest = await createUser({ email: 'guest@example.test' })
+      const prop = await createProperty(host.token)
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(4), guests: 2 });
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe('pending');
-      expect(res.body.expires_at).toBeTruthy();
-      expect(Number(res.body.platform_fee)).toBeCloseTo(Number(res.body.total_price) * 0.155, 1);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(4), guests: 2 })
+      expect(res.status).toBe(201)
+      expect(res.body.status).toBe('pending')
+      expect(res.body.expires_at).toBeTruthy()
+      expect(Number(res.body.platform_fee)).toBeCloseTo(Number(res.body.total_price) * 0.155, 1)
+    })
 
     it('calcula taxa de 15,5% corretamente', async () => {
-      const host = await createUser({ email: 'host2@example.test' });
-      const guest = await createUser({ email: 'guest2@example.test' });
-      const prop = await createProperty(host.token, { price_per_night: 1000 });
+      const host = await createUser({ email: 'host2@example.test' })
+      const guest = await createUser({ email: 'guest2@example.test' })
+      const prop = await createProperty(host.token, { price_per_night: 1000 })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(2), guests: 1 });
-      expect(res.status).toBe(201);
-      expect(Number(res.body.total_price)).toBe(1000);
-      expect(Number(res.body.platform_fee)).toBe(155);
-      expect(Number(res.body.host_net)).toBe(845);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(2), guests: 1 })
+      expect(res.status).toBe(201)
+      expect(Number(res.body.total_price)).toBe(1000)
+      expect(Number(res.body.platform_fee)).toBe(155)
+      expect(Number(res.body.host_net)).toBe(845)
+    })
 
     it('rejeita datas em conflito (409)', async () => {
-      const host = await createUser({ email: 'host3@example.test' });
-      const guest = await createUser({ email: 'guest3@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(guest.token, prop.id, { check_in: futureDate(1), check_out: futureDate(5) });
+      const host = await createUser({ email: 'host3@example.test' })
+      const guest = await createUser({ email: 'guest3@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(guest.token, prop.id, { check_in: futureDate(1), check_out: futureDate(5) })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(2), check_out: futureDate(4), guests: 1 });
-      expect(res.status).toBe(409);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(2), check_out: futureDate(4), guests: 1 })
+      expect(res.status).toBe(409)
+    })
 
     it('rejeita datas parcialmente sobrepostas', async () => {
-      const host = await createUser({ email: 'host4@example.test' });
-      const guest = await createUser({ email: 'guest4@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(guest.token, prop.id, { check_in: futureDate(3), check_out: futureDate(7) });
+      const host = await createUser({ email: 'host4@example.test' })
+      const guest = await createUser({ email: 'guest4@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(guest.token, prop.id, { check_in: futureDate(3), check_out: futureDate(7) })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(5), guests: 1 });
-      expect(res.status).toBe(409);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(5), guests: 1 })
+      expect(res.status).toBe(409)
+    })
 
     it('permite reservas em datas diferentes no mesmo imóvel', async () => {
-      const host = await createUser({ email: 'host5@example.test' });
-      const g1 = await createUser({ email: 'g1@example.test' });
-      const g2 = await createUser({ email: 'g2@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(g1.token, prop.id, { check_in: futureDate(1), check_out: futureDate(3) });
+      const host = await createUser({ email: 'host5@example.test' })
+      const g1 = await createUser({ email: 'g1@example.test' })
+      const g2 = await createUser({ email: 'g2@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(g1.token, prop.id, { check_in: futureDate(1), check_out: futureDate(3) })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${g2.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(5), check_out: futureDate(8), guests: 1 });
-      expect(res.status).toBe(201);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(5), check_out: futureDate(8), guests: 1 })
+      expect(res.status).toBe(201)
+    })
 
     it('rejeita sem autenticação', async () => {
-      const { token } = await createUser({ email: 'h6@example.test' });
-      const prop = await createProperty(token);
+      const { token } = await createUser({ email: 'h6@example.test' })
+      const prop = await createProperty(token)
       const res = await request(app).post('/api/reservations')
-        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(3), guests: 1 });
-      expect(res.status).toBe(401);
-    });
+        .send({ property_id: prop.id, check_in: futureDate(1), check_out: futureDate(3), guests: 1 })
+      expect(res.status).toBe(401)
+    })
 
     it('rejeita property_id inexistente', async () => {
-      const { token } = await createUser({ email: 'g7@example.test' });
+      const { token } = await createUser({ email: 'g7@example.test' })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${token}`)
-        .send({ property_id: '00000000-0000-0000-0000-000000000000', check_in: futureDate(1), check_out: futureDate(3), guests: 1 });
-      expect(res.status).toBe(404);
-    });
+        .send({ property_id: '00000000-0000-0000-0000-000000000000', check_in: futureDate(1), check_out: futureDate(3), guests: 1 })
+      expect(res.status).toBe(404)
+    })
 
     it('rejeita campos obrigatórios em falta', async () => {
-      const { token } = await createUser({ email: 'g8@example.test' });
+      const { token } = await createUser({ email: 'g8@example.test' })
       const res = await request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${token}`)
-        .send({ check_in: futureDate(1) });
-      expect(res.status).toBe(400);
-    });
+        .send({ check_in: futureDate(1) })
+      expect(res.status).toBe(400)
+    })
 
     it('evita reservas simultâneas concorrentes (dupla reserva/double-booking)', async () => {
-      const host = await createUser({ email: 'concur_h@example.test' });
-      const g1 = await createUser({ email: 'concur_g1@example.test' });
-      const g2 = await createUser({ email: 'concur_g2@example.test' });
-      const prop = await createProperty(host.token);
+      const host = await createUser({ email: 'concur_h@example.test' })
+      const g1 = await createUser({ email: 'concur_g1@example.test' })
+      const g2 = await createUser({ email: 'concur_g2@example.test' })
+      const prop = await createProperty(host.token)
 
       // Disparar duas requisições concorrentes simultâneas (Promise.all)
       const req1 = request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${g1.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(10), check_out: futureDate(12), guests: 1 });
+        .send({ property_id: prop.id, check_in: futureDate(10), check_out: futureDate(12), guests: 1 })
 
       const req2 = request(app).post('/api/reservations')
         .set('Authorization', `Bearer ${g2.token}`)
-        .send({ property_id: prop.id, check_in: futureDate(10), check_out: futureDate(12), guests: 1 });
+        .send({ property_id: prop.id, check_in: futureDate(10), check_out: futureDate(12), guests: 1 })
 
-      const [res1, res2] = await Promise.all([req1, req2]);
+      const [res1, res2] = await Promise.all([req1, req2])
 
       // Um dos dois deve ter sucesso (201) e o outro deve falhar com conflito (409)
-      const statuses = [res1.status, res2.status];
-      expect(statuses).toContain(201);
-      expect(statuses).toContain(409);
-    });
-  });
+      const statuses = [res1.status, res2.status]
+      expect(statuses).toContain(201)
+      expect(statuses).toContain(409)
+    })
+  })
 
   describe('GET / — listagem', () => {
     it('lista reservas do hóspede autenticado', async () => {
-      const host = await createUser({ email: 'lh@example.test' });
-      const guest = await createUser({ email: 'lg@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(guest.token, prop.id);
+      const host = await createUser({ email: 'lh@example.test' })
+      const guest = await createUser({ email: 'lg@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(guest.token, prop.id)
       const res = await request(app).get('/api/reservations')
-        .set('Authorization', `Bearer ${guest.token}`);
-      expect(res.status).toBe(200);
-      expect(res.body.length).toBe(1);
-    });
+        .set('Authorization', `Bearer ${guest.token}`)
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(1)
+    })
 
     it('não mostra reservas de outros utilizadores', async () => {
-      const host = await createUser({ email: 'lh2@example.test' });
-      const g1 = await createUser({ email: 'lg2@example.test' });
-      const g2 = await createUser({ email: 'lg3@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(g1.token, prop.id);
+      const host = await createUser({ email: 'lh2@example.test' })
+      const g1 = await createUser({ email: 'lg2@example.test' })
+      const g2 = await createUser({ email: 'lg3@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(g1.token, prop.id)
       const res = await request(app).get('/api/reservations')
-        .set('Authorization', `Bearer ${g2.token}`);
-      expect(res.status).toBe(200);
-      expect(res.body.length).toBe(0);
-    });
+        .set('Authorization', `Bearer ${g2.token}`)
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(0)
+    })
 
     it('cancela e oculta reserva pendente expirada do histórico do hóspede', async () => {
-      const host = await createUser({ email: 'expired-list-host@example.test' });
-      const guest = await createUser({ email: 'expired-list-guest@example.test' });
-      const prop = await createProperty(host.token);
-      const reservation = await createReservation(guest.token, prop.id);
+      const host = await createUser({ email: 'expired-list-host@example.test' })
+      const guest = await createUser({ email: 'expired-list-guest@example.test' })
+      const prop = await createProperty(host.token)
+      const reservation = await createReservation(guest.token, prop.id)
       await pool.query(
-        `UPDATE reservations SET expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`,
+        'UPDATE reservations SET expires_at = NOW() - INTERVAL \'1 minute\' WHERE id = $1',
         [reservation.id]
-      );
+      )
 
       const res = await request(app).get('/api/reservations')
-        .set('Authorization', `Bearer ${guest.token}`);
+        .set('Authorization', `Bearer ${guest.token}`)
 
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(0);
-      const stored = await pool.query('SELECT status, expired_at FROM reservations WHERE id = $1', [reservation.id]);
-      expect(stored.rows[0].status).toBe('cancelled');
-      expect(stored.rows[0].expired_at).toBeTruthy();
-    });
-  });
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveLength(0)
+      const stored = await pool.query('SELECT status, expired_at FROM reservations WHERE id = $1', [reservation.id])
+      expect(stored.rows[0].status).toBe('cancelled')
+      expect(stored.rows[0].expired_at).toBeTruthy()
+    })
+  })
 
   describe('PATCH /:id/status', () => {
     it('aprova reserva para pagamento', async () => {
-      const host = await createUser({ email: 'sh@example.test' });
-      const guest = await createUser({ email: 'sg@example.test' });
-      const prop = await createProperty(host.token);
-      const resv = await createReservation(guest.token, prop.id);
+      const host = await createUser({ email: 'sh@example.test' })
+      const guest = await createUser({ email: 'sg@example.test' })
+      const prop = await createProperty(host.token)
+      const resv = await createReservation(guest.token, prop.id)
       const res = await request(app).patch(`/api/reservations/${resv.id}/status`)
         .set('Authorization', `Bearer ${host.token}`)
-        .send({ status: 'approved' });
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe('approved');
-    });
+        .send({ status: 'approved' })
+      expect(res.status).toBe(200)
+      expect(res.body.status).toBe('approved')
+    })
 
     it('cancela reserva', async () => {
-      const host = await createUser({ email: 'ch@example.test' });
-      const guest = await createUser({ email: 'cg@example.test' });
-      const prop = await createProperty(host.token);
-      const resv = await createReservation(guest.token, prop.id);
+      const host = await createUser({ email: 'ch@example.test' })
+      const guest = await createUser({ email: 'cg@example.test' })
+      const prop = await createProperty(host.token)
+      const resv = await createReservation(guest.token, prop.id)
       const res = await request(app).patch(`/api/reservations/${resv.id}/status`)
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ status: 'cancelled' });
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe('cancelled');
-    });
+        .send({ status: 'cancelled' })
+      expect(res.status).toBe(200)
+      expect(res.body.status).toBe('cancelled')
+    })
 
     it('rejeita status inválido', async () => {
-      const host = await createUser({ email: 'ih@example.test' });
-      const guest = await createUser({ email: 'ig@example.test' });
-      const prop = await createProperty(host.token);
-      const resv = await createReservation(guest.token, prop.id);
+      const host = await createUser({ email: 'ih@example.test' })
+      const guest = await createUser({ email: 'ig@example.test' })
+      const prop = await createProperty(host.token)
+      const resv = await createReservation(guest.token, prop.id)
       const res = await request(app).patch(`/api/reservations/${resv.id}/status`)
         .set('Authorization', `Bearer ${guest.token}`)
-        .send({ status: 'hacked' });
-      expect(res.status).toBe(400);
-    });
-  });
+        .send({ status: 'hacked' })
+      expect(res.status).toBe(400)
+    })
+  })
 
   describe('GET /availability', () => {
     it('indica disponível quando não há reservas', async () => {
-      const { token } = await createUser({ email: 'av1@example.test' });
-      const prop = await createProperty(token);
+      const { token } = await createUser({ email: 'av1@example.test' })
+      const prop = await createProperty(token)
       const res = await request(app).get(
         `/api/reservations/availability?property_id=${prop.id}&check_in=${futureDate(1)}&check_out=${futureDate(3)}`
-      );
-      expect(res.status).toBe(200);
-      expect(res.body.available).toBe(true);
-    });
+      )
+      expect(res.status).toBe(200)
+      expect(res.body.available).toBe(true)
+    })
 
     it('indica indisponível quando há conflito', async () => {
-      const host = await createUser({ email: 'av2h@example.test' });
-      const guest = await createUser({ email: 'av2g@example.test' });
-      const prop = await createProperty(host.token);
-      await createReservation(guest.token, prop.id, { check_in: futureDate(1), check_out: futureDate(5) });
+      const host = await createUser({ email: 'av2h@example.test' })
+      const guest = await createUser({ email: 'av2g@example.test' })
+      const prop = await createProperty(host.token)
+      await createReservation(guest.token, prop.id, { check_in: futureDate(1), check_out: futureDate(5) })
       const res = await request(app).get(
         `/api/reservations/availability?property_id=${prop.id}&check_in=${futureDate(2)}&check_out=${futureDate(4)}`
-      );
-      expect(res.status).toBe(200);
-      expect(res.body.available).toBe(false);
-    });
+      )
+      expect(res.status).toBe(200)
+      expect(res.body.available).toBe(false)
+    })
 
     it('libera imediatamente as datas de reserva pendente expirada', async () => {
-      const host = await createUser({ email: 'av-expired-h@example.test' });
-      const guest = await createUser({ email: 'av-expired-g@example.test' });
-      const prop = await createProperty(host.token);
+      const host = await createUser({ email: 'av-expired-h@example.test' })
+      const guest = await createUser({ email: 'av-expired-g@example.test' })
+      const prop = await createProperty(host.token)
       const reservation = await createReservation(guest.token, prop.id, {
         check_in: futureDate(1),
-        check_out: futureDate(5),
-      });
+        check_out: futureDate(5)
+      })
       await pool.query(
-        `UPDATE reservations SET expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`,
+        'UPDATE reservations SET expires_at = NOW() - INTERVAL \'1 minute\' WHERE id = $1',
         [reservation.id]
-      );
+      )
 
       const res = await request(app).get(
         `/api/reservations/availability?property_id=${prop.id}&check_in=${futureDate(2)}&check_out=${futureDate(4)}`
-      );
+      )
 
-      expect(res.status).toBe(200);
-      expect(res.body.available).toBe(true);
-    });
-  });
-});
+      expect(res.status).toBe(200)
+      expect(res.body.available).toBe(true)
+    })
+  })
+})

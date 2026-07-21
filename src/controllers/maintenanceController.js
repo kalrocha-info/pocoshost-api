@@ -1,5 +1,5 @@
-import { pool } from '../db/pool.js';
-import { assertUUID, sendServerError } from '../utils/http.js';
+import { pool } from '../db/pool.js'
+import { assertUUID, sendServerError } from '../utils/http.js'
 
 const ORDER_SELECT = `
   SELECT
@@ -21,9 +21,9 @@ const ORDER_SELECT = `
   FROM maintenance_orders mo
   LEFT JOIN service_providers sp ON sp.id = mo.service_provider_id
   LEFT JOIN maintenance_order_photos mop ON mop.order_id = mo.id
-`;
+`
 
-function groupByOrder() {
+function groupByOrder () {
   return `
     GROUP BY mo.id, sp.name
     ORDER BY
@@ -37,38 +37,38 @@ function groupByOrder() {
         ELSE 7
       END,
       mo.updated_date DESC
-  `;
+  `
 }
 
-export async function listContactMaintenanceOrders(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function listContactMaintenanceOrders (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
   try {
     const result = await pool.query(
       `${ORDER_SELECT}
        WHERE mo.contact_id = $1
        ${groupByOrder()}`,
-      [req.params.id],
-    );
+      [req.params.id]
+    )
 
-    return res.json({ orders: result.rows });
+    return res.json({ orders: result.rows })
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function createContactMaintenanceOrder(req, res) {
-  if (!assertUUID(res, req.params.id)) return;
+export async function createContactMaintenanceOrder (req, res) {
+  if (!assertUUID(res, req.params.id)) return
 
-  const client = await pool.connect();
+  const client = await pool.connect()
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN')
     const contact = await client.query('SELECT id FROM crm_contacts WHERE id = $1 FOR UPDATE', [
-      req.params.id,
-    ]);
+      req.params.id
+    ])
     if (!contact.rows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Contacto não encontrado.' });
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Contacto não encontrado.' })
     }
 
     const {
@@ -81,8 +81,8 @@ export async function createContactMaintenanceOrder(req, res) {
       description,
       provider_amount: providerAmount,
       coordination_fee: coordinationFee,
-      scheduled_for: scheduledFor,
-    } = req.body;
+      scheduled_for: scheduledFor
+    } = req.body
 
     const created = await client.query(
       `INSERT INTO maintenance_orders (
@@ -104,28 +104,28 @@ export async function createContactMaintenanceOrder(req, res) {
         providerAmount ?? null,
         coordinationFee ?? null,
         scheduledFor ?? null,
-        req.user.id,
-      ],
-    );
+        req.user.id
+      ]
+    )
 
     await client.query(
       `INSERT INTO crm_activities (contact_id, author_id, activity_type, content)
        VALUES ($1, $2, 'task', $3)`,
-      [req.params.id, req.user.id, `Ordem de manutenção criada: ${title}.`],
-    );
-    await client.query('COMMIT');
+      [req.params.id, req.user.id, `Ordem de manutenção criada: ${title}.`]
+    )
+    await client.query('COMMIT')
 
-    return res.status(201).json(created.rows[0]);
+    return res.status(201).json(created.rows[0])
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    return sendServerError(res, err);
+    await client.query('ROLLBACK').catch(() => {})
+    return sendServerError(res, err)
   } finally {
-    client.release();
+    client.release()
   }
 }
 
-export async function updateMaintenanceOrder(req, res) {
-  if (!assertUUID(res, req.params.orderId, 'orderId')) return;
+export async function updateMaintenanceOrder (req, res) {
+  if (!assertUUID(res, req.params.orderId, 'orderId')) return
 
   try {
     const fields = {
@@ -139,62 +139,62 @@ export async function updateMaintenanceOrder(req, res) {
       provider_amount: req.body.provider_amount,
       coordination_fee: req.body.coordination_fee,
       scheduled_for: req.body.scheduled_for,
-      completed_at: req.body.completed_at,
-    };
-    const updates = [];
-    const params = [];
+      completed_at: req.body.completed_at
+    }
+    const updates = []
+    const params = []
 
     for (const [field, value] of Object.entries(fields)) {
       if (value !== undefined) {
-        params.push(value);
-        updates.push(`${field} = $${params.length}`);
+        params.push(value)
+        updates.push(`${field} = $${params.length}`)
       }
     }
 
-    params.push(req.user.id);
-    updates.push(`updated_by = $${params.length}`, 'updated_date = NOW()');
-    params.push(req.params.orderId);
+    params.push(req.user.id)
+    updates.push(`updated_by = $${params.length}`, 'updated_date = NOW()')
+    params.push(req.params.orderId)
 
     const result = await pool.query(
       `UPDATE maintenance_orders
           SET ${updates.join(', ')}
         WHERE id = $${params.length}
         RETURNING *`,
-      params,
-    );
+      params
+    )
     if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Ordem de manutenção não encontrada.' });
+      return res.status(404).json({ error: 'Ordem de manutenção não encontrada.' })
     }
 
-    return res.json(result.rows[0]);
+    return res.json(result.rows[0])
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }
 
-export async function createMaintenanceOrderPhoto(req, res) {
-  if (!assertUUID(res, req.params.orderId, 'orderId')) return;
+export async function createMaintenanceOrderPhoto (req, res) {
+  if (!assertUUID(res, req.params.orderId, 'orderId')) return
 
   try {
     const order = await pool.query('SELECT id FROM maintenance_orders WHERE id = $1', [
-      req.params.orderId,
-    ]);
+      req.params.orderId
+    ])
     if (!order.rows[0]) {
-      return res.status(404).json({ error: 'Ordem de manutenção não encontrada.' });
+      return res.status(404).json({ error: 'Ordem de manutenção não encontrada.' })
     }
 
-    const { photo_type: photoType, url, caption } = req.body;
+    const { photo_type: photoType, url, caption } = req.body
     const result = await pool.query(
       `INSERT INTO maintenance_order_photos (
          order_id, photo_type, url, caption, created_by
        )
        VALUES ($1,$2,$3,$4,$5)
        RETURNING *`,
-      [req.params.orderId, photoType, url, caption ?? null, req.user.id],
-    );
+      [req.params.orderId, photoType, url, caption ?? null, req.user.id]
+    )
 
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json(result.rows[0])
   } catch (err) {
-    return sendServerError(res, err);
+    return sendServerError(res, err)
   }
 }

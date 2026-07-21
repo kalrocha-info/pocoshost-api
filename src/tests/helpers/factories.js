@@ -1,27 +1,27 @@
-import request from 'supertest';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { createApp } from '../../testApp.js';
-import { pool } from '../../db/pool.js';
-import { randomUUID } from 'crypto';
+import request from 'supertest'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { createApp } from '../../testApp.js'
+import { pool } from '../../db/pool.js'
+import { randomUUID } from 'crypto'
 
-export const app = createApp();
+export const app = createApp()
 
-function signTestToken(user) {
+function signTestToken (user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
-  );
+  )
 }
 
 // Cria usuário verificado para testes que não exercitam o fluxo de verificação de e-mail.
-export async function createUser(overrides = {}) {
-  const password = overrides.password ?? 'senha123';
-  const role = overrides.role ?? 'guest';
-  const documentType = role === 'host' ? (overrides.document_type ?? 'cpf') : overrides.document_type;
-  const documentNumber = role === 'host' ? (overrides.document_number ?? '00000000000') : overrides.document_number;
-  const passwordHash = await bcrypt.hash(password, 10);
+export async function createUser (overrides = {}) {
+  const password = overrides.password ?? 'senha123'
+  const role = overrides.role ?? 'guest'
+  const documentType = role === 'host' ? (overrides.document_type ?? 'cpf') : overrides.document_type
+  const documentNumber = role === 'host' ? (overrides.document_number ?? '00000000000') : overrides.document_number
+  const passwordHash = await bcrypt.hash(password, 10)
   const result = await pool.query(
     `INSERT INTO users
       (full_name, email, password_hash, role, document_type, document_number,
@@ -37,14 +37,14 @@ export async function createUser(overrides = {}) {
       documentNumber,
       overrides.company_name,
       overrides.address_info,
-      Object.prototype.hasOwnProperty.call(overrides, 'asaas_wallet_id') ? overrides.asaas_wallet_id : 'wal_host_test_mock',
+      Object.prototype.hasOwnProperty.call(overrides, 'asaas_wallet_id') ? overrides.asaas_wallet_id : 'wal_host_test_mock'
     ]
-  );
-  const user = result.rows[0];
-  return { token: signTestToken(user), user, password };
+  )
+  const user = result.rows[0]
+  return { token: signTestToken(user), user, password }
 }
 
-export async function createProperty(token, overrides = {}) {
+export async function createProperty (token, overrides = {}) {
   const data = {
     title: overrides.title ?? 'Pousada Teste',
     city: overrides.city ?? 'Poços de Caldas',
@@ -56,32 +56,32 @@ export async function createProperty(token, overrides = {}) {
     bathrooms: 1,
     tags: ['wifi', 'piscina'],
     cover_photo: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=400',
-    ...overrides,
-  };
+    ...overrides
+  }
   const res = await request(app)
     .post('/api/properties')
     .set('Authorization', `Bearer ${token}`)
-    .send(data);
-  return res.body;
+    .send(data)
+  return res.body
 }
 
-export async function createReservation(token, propertyId, overrides = {}) {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const dayAfter = new Date(); dayAfter.setDate(dayAfter.getDate() + 3);
+export async function createReservation (token, propertyId, overrides = {}) {
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+  const dayAfter = new Date(); dayAfter.setDate(dayAfter.getDate() + 3)
   const data = {
     property_id: propertyId,
     check_in: overrides.check_in ?? tomorrow.toISOString().split('T')[0],
     check_out: overrides.check_out ?? dayAfter.toISOString().split('T')[0],
-    guests: overrides.guests ?? 2,
-  };
+    guests: overrides.guests ?? 2
+  }
   const res = await request(app)
     .post('/api/reservations')
     .set('Authorization', `Bearer ${token}`)
-    .send(data);
-  return res.body;
+    .send(data)
+  return res.body
 }
 
-export async function approveReservation(reservationId) {
+export async function approveReservation (reservationId) {
   const result = await pool.query(
     `UPDATE reservations
         SET status = 'approved',
@@ -91,6 +91,6 @@ export async function approveReservation(reservationId) {
       WHERE id = $1
       RETURNING *`,
     [reservationId]
-  );
-  return result.rows[0];
+  )
+  return result.rows[0]
 }

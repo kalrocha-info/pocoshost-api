@@ -2,9 +2,17 @@
   "name": "pocoshost-api",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "packageManager": "npm@11.16.0",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "build": "node -e \"console.log(\u0027pocoshost-api: no build step\u0027)\"",
+    "build": "node -e \"console.log('pocoshost-api: no build step')\"",
+    "lint": "eslint \"src/**/*.js\" \"test/**/*.js\" \"*.mjs\" \"*.cjs\" --no-error-on-unmatched-pattern --report-unused-disable-directives",
+    "lint:fix": "npm run lint -- --fix",
+    "prepare": "husky",
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
@@ -28,9 +36,23 @@
     "streamifier": "^0.1.1",
     "zod": "^4.4.3"
   },
+  "lint-staged": {
+    "src/**/*.js": "eslint --fix --max-warnings=0",
+    "test/**/*.js": "eslint --fix --max-warnings=0",
+    "*.mjs": "eslint --fix --max-warnings=0",
+    "*.cjs": "eslint --fix --max-warnings=0"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.9",
     "dotenv-cli": "^11.0.0",
+    "eslint": "^8.57.1",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "supertest": "^7.2.2",
     "vitest": "^4.1.9"
   }

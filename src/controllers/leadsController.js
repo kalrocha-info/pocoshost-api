@@ -1,5 +1,5 @@
-import { pool } from '../db/pool.js';
-import { sendServerError } from '../utils/http.js';
+import { pool } from '../db/pool.js'
+import { sendServerError } from '../utils/http.js'
 
 const PROPERTY_TYPE_LABELS = {
   casa: 'casa',
@@ -8,53 +8,53 @@ const PROPERTY_TYPE_LABELS = {
   pousada: 'pousada',
   sitio: 'sítio',
   hotel: 'hotel',
-  outro: 'imóvel',
-};
+  outro: 'imóvel'
+}
 const MANAGEMENT_INTEREST_LABELS = {
   complete_management: 'gestão completa',
   direct_listing: 'anúncio/reserva direta',
   maintenance_only: 'manutenção e preparação',
-  unsure: 'avaliação inicial',
-};
+  unsure: 'avaliação inicial'
+}
 const PROPERTY_STATUS_LABELS = {
   ready: 'pronto para receber hóspedes',
   needs_adjustments: 'precisa de ajustes',
   under_renovation: 'em reforma',
   planning: 'em planejamento',
-  unknown: 'status não informado',
-};
-const PRIVACY_POLICY_VERSION = '2.1';
+  unknown: 'status não informado'
+}
+const PRIVACY_POLICY_VERSION = '2.1'
 
-function normalizePhone(value) {
-  return value ? value.replace(/\D/g, '') : null;
+function normalizePhone (value) {
+  return value ? value.replace(/\D/g, '') : null
 }
 
-function formatBedrooms(bedrooms) {
-  if (bedrooms === null || bedrooms === undefined) return null;
-  if (bedrooms === 0) return 'sem quarto informado';
-  if (bedrooms === 1) return '1 quarto';
-  return `${bedrooms} quartos`;
+function formatBedrooms (bedrooms) {
+  if (bedrooms === null || bedrooms === undefined) return null
+  if (bedrooms === 0) return 'sem quarto informado'
+  if (bedrooms === 1) return '1 quarto'
+  return `${bedrooms} quartos`
 }
 
-function buildSummary({
+function buildSummary ({
   propertyType,
   city,
   neighborhood,
   bedrooms,
   managementInterest,
-  propertyStatus,
+  propertyStatus
 }) {
-  const label = PROPERTY_TYPE_LABELS[propertyType] ?? 'imóvel';
-  const location = neighborhood ? `${neighborhood}, ${city}` : city;
-  const interest = MANAGEMENT_INTEREST_LABELS[managementInterest] ?? 'gestão completa';
+  const label = PROPERTY_TYPE_LABELS[propertyType] ?? 'imóvel'
+  const location = neighborhood ? `${neighborhood}, ${city}` : city
+  const interest = MANAGEMENT_INTEREST_LABELS[managementInterest] ?? 'gestão completa'
   const details = [formatBedrooms(bedrooms), PROPERTY_STATUS_LABELS[propertyStatus]]
     .filter(Boolean)
-    .join('; ');
-  const suffix = details ? ` (${details})` : '';
-  return `Interesse em ${interest} para ${label} em ${location}${suffix}.`;
+    .join('; ')
+  const suffix = details ? ` (${details})` : ''
+  return `Interesse em ${interest} para ${label} em ${location}${suffix}.`
 }
 
-function buildActivity({
+function buildActivity ({
   propertyType,
   city,
   neighborhood,
@@ -64,7 +64,7 @@ function buildActivity({
   acceptsMaintenanceCoordination,
   notes,
   landingPage,
-  marketingConsent,
+  marketingConsent
 }) {
   const summary = buildSummary({
     propertyType,
@@ -72,25 +72,25 @@ function buildActivity({
     neighborhood,
     bedrooms,
     managementInterest,
-    propertyStatus,
-  });
+    propertyStatus
+  })
   const origin = landingPage
     ? `${summary} Formulário enviado em ${landingPage}.`
-    : `${summary} Formulário público enviado.`;
+    : `${summary} Formulário público enviado.`
   const maintenance = acceptsMaintenanceCoordination
     ? 'aceita coordenação de manutenção'
-    : 'não marcou coordenação de manutenção';
-  const observation = notes ? ` Observações: ${notes}.` : '';
-  return `${origin} ${maintenance}. Política de Privacidade v${PRIVACY_POLICY_VERSION} aceita; contato autorizado; marketing: ${marketingConsent ? 'sim' : 'não'}.${observation}`;
+    : 'não marcou coordenação de manutenção'
+  const observation = notes ? ` Observações: ${notes}.` : ''
+  return `${origin} ${maintenance}. Política de Privacidade v${PRIVACY_POLICY_VERSION} aceita; contato autorizado; marketing: ${marketingConsent ? 'sim' : 'não'}.${observation}`
 }
 
-export async function createHostLead(req, res) {
+export async function createHostLead (req, res) {
   // Honeypot: confirma o recebimento sem persistir ou revelar o bloqueio ao bot.
   if (req.body.website) {
     return res.status(202).json({
       success: true,
-      message: 'Recebemos seus dados e entraremos em contato.',
-    });
+      message: 'Recebemos seus dados e entraremos em contato.'
+    })
   }
 
   const {
@@ -112,18 +112,18 @@ export async function createHostLead(req, res) {
     utm_content: utmContent,
     utm_term: utmTerm,
     landing_page: landingPage,
-    referrer,
-  } = req.body;
-  const normalizedEmail = email?.toLowerCase() ?? null;
-  const normalizedPhone = normalizePhone(phone);
+    referrer
+  } = req.body
+  const normalizedEmail = email?.toLowerCase() ?? null
+  const normalizedPhone = normalizePhone(phone)
   const summary = buildSummary({
     propertyType,
     city,
     neighborhood,
     bedrooms,
     managementInterest,
-    propertyStatus,
-  });
+    propertyStatus
+  })
   const activityContent = buildActivity({
     propertyType,
     city,
@@ -134,12 +134,12 @@ export async function createHostLead(req, res) {
     acceptsMaintenanceCoordination,
     notes,
     landingPage,
-    marketingConsent,
-  });
+    marketingConsent
+  })
 
-  const client = await pool.connect();
+  const client = await pool.connect()
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN')
     const existing = await client.query(
       `SELECT id, user_id
          FROM crm_contacts
@@ -149,12 +149,12 @@ export async function createHostLead(req, res) {
         ORDER BY CASE WHEN user_id IS NOT NULL THEN 0 ELSE 1 END, updated_date DESC
         LIMIT 1
         FOR UPDATE`,
-      [normalizedEmail, normalizedPhone],
-    );
+      [normalizedEmail, normalizedPhone]
+    )
 
-    let contactId;
+    let contactId
     if (existing.rows[0]) {
-      contactId = existing.rows[0].id;
+      contactId = existing.rows[0].id
       await client.query(
         `UPDATE crm_contacts
             SET full_name = CASE WHEN user_id IS NULL THEN $1 ELSE full_name END,
@@ -201,9 +201,9 @@ export async function createHostLead(req, res) {
           landingPage ?? null,
           referrer ?? null,
           marketingConsent,
-          contactId,
-        ],
-      );
+          contactId
+        ]
+      )
     } else {
       const created = await client.query(
         `INSERT INTO crm_contacts (
@@ -230,10 +230,10 @@ export async function createHostLead(req, res) {
           utmTerm ?? null,
           landingPage ?? null,
           referrer ?? null,
-          marketingConsent,
-        ],
-      );
-      contactId = created.rows[0].id;
+          marketingConsent
+        ]
+      )
+      contactId = created.rows[0].id
     }
 
     await client.query(
@@ -261,25 +261,25 @@ export async function createHostLead(req, res) {
         managementInterest,
         propertyStatus,
         acceptsMaintenanceCoordination,
-        notes ?? null,
-      ],
-    );
+        notes ?? null
+      ]
+    )
 
     await client.query(
       `INSERT INTO crm_activities (contact_id, activity_type, content)
        VALUES ($1, 'note', $2)`,
-      [contactId, activityContent],
-    );
-    await client.query('COMMIT');
+      [contactId, activityContent]
+    )
+    await client.query('COMMIT')
 
     return res.status(201).json({
       success: true,
-      message: 'Recebemos seus dados e entraremos em contato.',
-    });
+      message: 'Recebemos seus dados e entraremos em contato.'
+    })
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    return sendServerError(res, err);
+    await client.query('ROLLBACK').catch(() => {})
+    return sendServerError(res, err)
   } finally {
-    client.release();
+    client.release()
   }
 }

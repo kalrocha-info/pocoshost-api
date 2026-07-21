@@ -1,74 +1,74 @@
-import request from 'supertest';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { createApp } from '../testApp.js';
-import { pool } from '../db/pool.js';
-import { approveReservation, createUser, createProperty, createReservation } from './helpers/factories.js';
-import { creditCardPaymentPayload } from './helpers/paymentPayload.js';
+import request from 'supertest'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { createApp } from '../testApp.js'
+import { pool } from '../db/pool.js'
+import { approveReservation, createUser, createProperty, createReservation } from './helpers/factories.js'
+import { creditCardPaymentPayload } from './helpers/paymentPayload.js'
 
-const app = createApp();
+const app = createApp()
 
-async function createAdmin(overrides = {}) {
-  const password = overrides.password ?? 'senha123';
-  const passwordHash = await bcrypt.hash(password, 10);
+async function createAdmin (overrides = {}) {
+  const password = overrides.password ?? 'senha123'
+  const passwordHash = await bcrypt.hash(password, 10)
   const result = await pool.query(
     `INSERT INTO users (full_name, email, password_hash, role, email_verified, email_verified_at)
      VALUES ($1, $2, $3, 'admin', TRUE, NOW())
      RETURNING id, email, full_name, role, email_verified`,
     [overrides.full_name ?? 'Admin Teste', overrides.email ?? `admin_${Date.now()}@example.test`, passwordHash]
-  );
-  const user = result.rows[0];
+  )
+  const user = result.rows[0]
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
-  );
-  return { token, user, password };
+  )
+  return { token, user, password }
 }
 
 describe('ADMIN — /api/admin', () => {
   it('bloqueia acesso sem token', async () => {
-    const res = await request(app).get('/api/admin/stats');
-    expect(res.status).toBe(401);
-  });
+    const res = await request(app).get('/api/admin/stats')
+    expect(res.status).toBe(401)
+  })
 
   it('bloqueia guest em rotas admin', async () => {
-    const guest = await createUser();
+    const guest = await createUser()
     const res = await request(app)
       .get('/api/admin/stats')
-      .set('Authorization', `Bearer ${guest.token}`);
-    expect(res.status).toBe(403);
-  });
+      .set('Authorization', `Bearer ${guest.token}`)
+    expect(res.status).toBe(403)
+  })
 
   it('permite admin consultar estatisticas', async () => {
-    const admin = await createAdmin();
+    const admin = await createAdmin()
     const res = await request(app)
       .get('/api/admin/stats')
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.total_admins).toBeDefined();
-    expect(res.body.total_hosts).toBeDefined();
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total_admins).toBeDefined()
+    expect(res.body.total_hosts).toBeDefined()
+  })
 
   it('lista usuarios sem expor password_hash nem documento completo', async () => {
-    const admin = await createAdmin();
-    await createUser({ email: 'cliente-admin-list@example.test' });
+    const admin = await createAdmin()
+    await createUser({ email: 'cliente-admin-list@example.test' })
 
     const res = await request(app)
       .get('/api/admin/users')
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.users)).toBe(true);
-    expect(res.body.users[0].password_hash).toBeUndefined();
-    expect(res.body.users[0].document_number).toBeUndefined();
-    expect(res.body.users[0].active_guest_reservations_count).toBeDefined();
-    expect(res.body.users[0].properties_count).toBeDefined();
-    expect(res.body.users[0].active_properties_count).toBeDefined();
-  });
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.users)).toBe(true)
+    expect(res.body.users[0].password_hash).toBeUndefined()
+    expect(res.body.users[0].document_number).toBeUndefined()
+    expect(res.body.users[0].active_guest_reservations_count).toBeDefined()
+    expect(res.body.users[0].properties_count).toBeDefined()
+    expect(res.body.users[0].active_properties_count).toBeDefined()
+  })
 
   it('cria usuario admin pelo painel administrativo', async () => {
-    const admin = await createAdmin();
+    const admin = await createAdmin()
     const res = await request(app)
       .post('/api/admin/users')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -76,112 +76,112 @@ describe('ADMIN — /api/admin', () => {
         full_name: 'Novo Admin',
         email: 'novo-admin@example.test',
         password: 'senha123',
-        role: 'admin',
-      });
+        role: 'admin'
+      })
 
-    expect(res.status).toBe(201);
-    expect(res.body.role).toBe('admin');
-    expect(res.body.password_hash).toBeUndefined();
+    expect(res.status).toBe(201)
+    expect(res.body.role).toBe('admin')
+    expect(res.body.password_hash).toBeUndefined()
 
     const login = await request(app).post('/api/auth/login').send({
       email: 'novo-admin@example.test',
-      password: 'senha123',
-    });
-    expect(login.status).toBe(200);
-    expect(login.body.user.role).toBe('admin');
-  });
+      password: 'senha123'
+    })
+    expect(login.status).toBe(200)
+    expect(login.body.user.role).toBe('admin')
+  })
 
   it('nao deixa admin remover a propria conta', async () => {
-    const admin = await createAdmin();
+    const admin = await createAdmin()
     const res = await request(app)
       .delete(`/api/admin/users/${admin.user.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(res.status).toBe(400);
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(res.status).toBe(400)
+  })
 
   it('nao deixa admin bloquear a propria conta', async () => {
-    const admin = await createAdmin();
+    const admin = await createAdmin()
     const res = await request(app)
       .put(`/api/admin/users/${admin.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ account_status: 'blocked' });
+      .send({ account_status: 'blocked' })
 
-    expect(res.status).toBe(400);
-  });
+    expect(res.status).toBe(400)
+  })
 
   it('bloqueia e desbloqueia usuario pelo painel administrativo', async () => {
-    const admin = await createAdmin();
-    const guest = await createUser({ email: 'guest-block-admin@example.test' });
+    const admin = await createAdmin()
+    const guest = await createUser({ email: 'guest-block-admin@example.test' })
 
     const blocked = await request(app)
       .put(`/api/admin/users/${guest.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ account_status: 'blocked' });
+      .send({ account_status: 'blocked' })
 
-    expect(blocked.status).toBe(200);
-    expect(blocked.body.account_status).toBe('blocked');
+    expect(blocked.status).toBe(200)
+    expect(blocked.body.account_status).toBe('blocked')
 
     const unblocked = await request(app)
       .put(`/api/admin/users/${guest.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ account_status: 'active' });
+      .send({ account_status: 'active' })
 
-    expect(unblocked.status).toBe(200);
-    expect(unblocked.body.account_status).toBe('active');
-  });
+    expect(unblocked.status).toBe(200)
+    expect(unblocked.body.account_status).toBe('active')
+  })
 
   it('permite configurar wallet Asaas de anfitrião pelo painel', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-wallet-admin@example.test', asaas_wallet_id: null });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-wallet-admin@example.test', asaas_wallet_id: null })
     const res = await request(app)
       .put(`/api/admin/hosts/${host.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ asaas_wallet_id: 'wal_host_admin_test' });
+      .send({ asaas_wallet_id: 'wal_host_admin_test' })
 
-    expect(res.status).toBe(200);
-    expect(res.body.asaas_wallet_id).toBe('wal_host_admin_test');
-  });
+    expect(res.status).toBe(200)
+    expect(res.body.asaas_wallet_id).toBe('wal_host_admin_test')
+  })
 
   it('bloqueia anfitriao pelo painel administrativo', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-block-admin@example.test' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-block-admin@example.test' })
 
     const res = await request(app)
       .put(`/api/admin/hosts/${host.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ account_status: 'blocked' });
+      .send({ account_status: 'blocked' })
 
-    expect(res.status).toBe(200);
-    expect(res.body.account_status).toBe('blocked');
-  });
+    expect(res.status).toBe(200)
+    expect(res.body.account_status).toBe('blocked')
+  })
 
   it('nao remove anfitriao com imoveis cadastrados', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-delete-with-property@example.test' });
-    await createProperty(host.token, { title: 'Imovel impede remocao de anfitriao' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-delete-with-property@example.test' })
+    await createProperty(host.token, { title: 'Imovel impede remocao de anfitriao' })
 
     const res = await request(app)
       .delete(`/api/admin/hosts/${host.user.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe('HOST_HAS_PROPERTIES');
-    expect(res.body.error).toMatch(/imoveis cadastrados/i);
-  });
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('HOST_HAS_PROPERTIES')
+    expect(res.body.error).toMatch(/imoveis cadastrados/i)
+  })
 
   it('bloqueio de anfitriao oculta imoveis publicos e impede nova reserva', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-block-public@example.test' });
-    const guest = await createUser({ email: 'guest-block-public@example.test' });
-    const property = await createProperty(host.token, { title: 'Imovel Anfitriao Bloqueado' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-block-public@example.test' })
+    const guest = await createUser({ email: 'guest-block-public@example.test' })
+    const property = await createProperty(host.token, { title: 'Imovel Anfitriao Bloqueado' })
 
     await request(app)
       .put(`/api/admin/hosts/${host.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ account_status: 'blocked' });
+      .send({ account_status: 'blocked' })
 
-    const detail = await request(app).get(`/api/properties/${property.id}`);
-    expect(detail.status).toBe(404);
+    const detail = await request(app).get(`/api/properties/${property.id}`)
+    expect(detail.status).toBe(404)
 
     const reservation = await request(app)
       .post('/api/reservations')
@@ -190,104 +190,104 @@ describe('ADMIN — /api/admin', () => {
         property_id: property.id,
         check_in: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         check_out: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
-        guests: 1,
-      });
-    expect(reservation.status).toBe(409);
-  });
+        guests: 1
+      })
+    expect(reservation.status).toBe(409)
+  })
 
   it('lista imoveis usando created_by/is_active do schema real', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-admin-prop@example.test' });
-    await createProperty(host.token, { title: 'Imovel Admin Schema' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-admin-prop@example.test' })
+    await createProperty(host.token, { title: 'Imovel Admin Schema' })
 
     const res = await request(app)
       .get('/api/admin/properties?status=active')
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(200);
-    expect(res.body.properties.some((property) => property.title === 'Imovel Admin Schema')).toBe(true);
-    expect(res.body.properties[0].owner_id).toBeDefined();
-    expect(res.body.properties[0].owner_name).toBeDefined();
-    expect(res.body.properties[0].status).toBe('active');
-    expect(res.body.properties[0].current_booking_status).toBeDefined();
-  });
+    expect(res.status).toBe(200)
+    expect(res.body.properties.some((property) => property.title === 'Imovel Admin Schema')).toBe(true)
+    expect(res.body.properties[0].owner_id).toBeDefined()
+    expect(res.body.properties[0].owner_name).toBeDefined()
+    expect(res.body.properties[0].status).toBe('active')
+    expect(res.body.properties[0].current_booking_status).toBeDefined()
+  })
 
   it('filtra imoveis por disponibilidade atual e anfitriao', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-filter-prop@example.test' });
-    await createProperty(host.token, { title: 'Imovel Disponivel Admin' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-filter-prop@example.test' })
+    await createProperty(host.token, { title: 'Imovel Disponivel Admin' })
 
     const res = await request(app)
       .get(`/api/admin/properties?owner_id=${host.user.id}&booking_status=available`)
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(200);
-    expect(res.body.properties.some((property) => property.title === 'Imovel Disponivel Admin')).toBe(true);
-    expect(res.body.properties.every((property) => property.owner_id === host.user.id)).toBe(true);
-    expect(res.body.properties.every((property) => property.current_booking_status === 'available')).toBe(true);
-  });
+    expect(res.status).toBe(200)
+    expect(res.body.properties.some((property) => property.title === 'Imovel Disponivel Admin')).toBe(true)
+    expect(res.body.properties.every((property) => property.owner_id === host.user.id)).toBe(true)
+    expect(res.body.properties.every((property) => property.current_booking_status === 'available')).toBe(true)
+  })
 
   it('nao remove imovel com reserva ativa', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-delete-prop@example.test' });
-    const guest = await createUser({ email: 'guest-delete-prop@example.test' });
-    const property = await createProperty(host.token, { title: 'Imovel com reserva ativa' });
-    await createReservation(guest.token, property.id);
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-delete-prop@example.test' })
+    const guest = await createUser({ email: 'guest-delete-prop@example.test' })
+    const property = await createProperty(host.token, { title: 'Imovel com reserva ativa' })
+    await createReservation(guest.token, property.id)
 
     const res = await request(app)
       .delete(`/api/admin/properties/${property.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/reservas ativas/i);
-  });
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/reservas ativas/i)
+  })
 
   it('nao remove hospede com reserva ativa e informa o motivo', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-guest-delete-active@example.test' });
-    const guest = await createUser({ email: 'guest-delete-active@example.test' });
-    const property = await createProperty(host.token, { title: 'Imovel reserva ativa guest' });
-    await createReservation(guest.token, property.id);
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-guest-delete-active@example.test' })
+    const guest = await createUser({ email: 'guest-delete-active@example.test' })
+    const property = await createProperty(host.token, { title: 'Imovel reserva ativa guest' })
+    await createReservation(guest.token, property.id)
 
     const res = await request(app)
       .delete(`/api/admin/users/${guest.user.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
+      .set('Authorization', `Bearer ${admin.token}`)
 
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe('USER_HAS_ACTIVE_GUEST_RESERVATIONS');
-    expect(res.body.error).toMatch(/reserva pendente, aprovada ou confirmada/i);
-  });
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('USER_HAS_ACTIVE_GUEST_RESERVATIONS')
+    expect(res.body.error).toMatch(/reserva pendente, aprovada ou confirmada/i)
+  })
 
   it('lista reservas e pagamentos com aliases esperados pelo painel', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-admin-flow@example.test' });
-    const guest = await createUser({ email: 'guest-admin-flow@example.test' });
-    const property = await createProperty(host.token, { title: 'Casa Fluxo Admin', price_per_night: 200 });
-    const reservation = await createReservation(guest.token, property.id);
-    await approveReservation(reservation.id);
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-admin-flow@example.test' })
+    const guest = await createUser({ email: 'guest-admin-flow@example.test' })
+    const property = await createProperty(host.token, { title: 'Casa Fluxo Admin', price_per_night: 200 })
+    const reservation = await createReservation(guest.token, property.id)
+    await approveReservation(reservation.id)
 
     await request(app)
       .post('/api/payments')
       .set('Authorization', `Bearer ${guest.token}`)
-      .send(creditCardPaymentPayload(reservation.id, { card_last4: '4242' }));
+      .send(creditCardPaymentPayload(reservation.id, { card_last4: '4242' }))
 
     const reservationsRes = await request(app)
       .get('/api/admin/reservations')
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(reservationsRes.status).toBe(200);
-    expect(reservationsRes.body.reservations[0].property_title).toBeDefined();
-    expect(reservationsRes.body.reservations[0].created_at).toBeDefined();
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(reservationsRes.status).toBe(200)
+    expect(reservationsRes.body.reservations[0].property_title).toBeDefined()
+    expect(reservationsRes.body.reservations[0].created_at).toBeDefined()
 
     const paymentsRes = await request(app)
       .get('/api/admin/payments')
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(paymentsRes.status).toBe(200);
-    expect(paymentsRes.body.payments[0].amount).toBeDefined();
-    expect(paymentsRes.body.payments[0].created_at).toBeDefined();
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(paymentsRes.status).toBe(200)
+    expect(paymentsRes.body.payments[0].amount).toBeDefined()
+    expect(paymentsRes.body.payments[0].created_at).toBeDefined()
+  })
 
   it('executa o ciclo administrativo completo de um anfitriao sem imoveis', async () => {
-    const admin = await createAdmin();
+    const admin = await createAdmin()
     const created = await request(app)
       .post('/api/admin/hosts')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -296,23 +296,23 @@ describe('ADMIN — /api/admin', () => {
         email: 'host-crud-admin@example.test',
         password: 'senha123',
         phone: '00000000000',
-        asaas_wallet_id: 'wal_admin_crud',
-      });
+        asaas_wallet_id: 'wal_admin_crud'
+      })
 
-    expect(created.status).toBe(201);
-    expect(created.body.role).toBe('host');
+    expect(created.status).toBe(201)
+    expect(created.body.role).toBe('host')
 
     const listed = await request(app)
       .get('/api/admin/hosts?search=host-crud-admin')
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(listed.status).toBe(200);
-    expect(listed.body.hosts).toHaveLength(1);
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(listed.status).toBe(200)
+    expect(listed.body.hosts).toHaveLength(1)
 
     const detail = await request(app)
       .get(`/api/admin/hosts/${created.body.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(detail.status).toBe(200);
-    expect(detail.body.properties).toEqual([]);
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(detail.status).toBe(200)
+    expect(detail.body.properties).toEqual([])
 
     const updated = await request(app)
       .put(`/api/admin/hosts/${created.body.id}`)
@@ -320,24 +320,24 @@ describe('ADMIN — /api/admin', () => {
       .send({
         full_name: 'Host CRUD Atualizado',
         account_status: 'blocked',
-        asaas_wallet_id: '',
-      });
-    expect(updated.status).toBe(200);
+        asaas_wallet_id: ''
+      })
+    expect(updated.status).toBe(200)
     expect(updated.body).toMatchObject({
       full_name: 'Host CRUD Atualizado',
       account_status: 'blocked',
-      asaas_wallet_id: null,
-    });
+      asaas_wallet_id: null
+    })
 
     const removed = await request(app)
       .delete(`/api/admin/hosts/${created.body.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(removed.status).toBe(204);
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(removed.status).toBe(204)
+  })
 
   it('executa o ciclo administrativo de um imovel sem reservas', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-property-crud@example.test' });
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-property-crud@example.test' })
     const created = await request(app)
       .post('/api/admin/properties')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -350,70 +350,70 @@ describe('ADMIN — /api/admin', () => {
         price_per_night: 250,
         category_slug: 'casa',
         amenities: ['wifi'],
-        status: 'active',
-      });
+        status: 'active'
+      })
 
-    expect(created.status).toBe(201);
+    expect(created.status).toBe(201)
     expect(created.body).toMatchObject({
       owner_id: host.user.id,
       title: 'Imovel CRUD Admin',
-      status: 'active',
-    });
+      status: 'active'
+    })
 
     const updated = await request(app)
       .put(`/api/admin/properties/${created.body.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ title: 'Imovel CRUD Atualizado', status: 'inactive' });
-    expect(updated.status).toBe(200);
+      .send({ title: 'Imovel CRUD Atualizado', status: 'inactive' })
+    expect(updated.status).toBe(200)
     expect(updated.body).toMatchObject({
       title: 'Imovel CRUD Atualizado',
-      status: 'inactive',
-    });
+      status: 'inactive'
+    })
 
     const removed = await request(app)
       .delete(`/api/admin/properties/${created.body.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(removed.status).toBe(204);
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(removed.status).toBe(204)
+  })
 
   it('atualiza reserva e consulta estatisticas financeiras com filtros', async () => {
-    const admin = await createAdmin();
-    const host = await createUser({ role: 'host', email: 'host-reservation-update@example.test' });
-    const guest = await createUser({ email: 'guest-reservation-update@example.test' });
-    const property = await createProperty(host.token, { title: 'Imovel Status Admin' });
-    const reservation = await createReservation(guest.token, property.id);
+    const admin = await createAdmin()
+    const host = await createUser({ role: 'host', email: 'host-reservation-update@example.test' })
+    const guest = await createUser({ email: 'guest-reservation-update@example.test' })
+    const property = await createProperty(host.token, { title: 'Imovel Status Admin' })
+    const reservation = await createReservation(guest.token, property.id)
 
     const approved = await request(app)
       .put(`/api/admin/reservations/${reservation.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ status: 'approved' });
-    expect(approved.status).toBe(200);
-    expect(approved.body.status).toBe('approved');
-    expect(approved.body.expires_at).toBeDefined();
+      .send({ status: 'approved' })
+    expect(approved.status).toBe(200)
+    expect(approved.body.status).toBe('approved')
+    expect(approved.body.expires_at).toBeDefined()
 
     const invalid = await request(app)
       .put(`/api/admin/reservations/${reservation.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ status: 'invalid' });
-    expect(invalid.status).toBe(400);
+      .send({ status: 'invalid' })
+    expect(invalid.status).toBe(400)
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10)
     const stats = await request(app)
       .get(`/api/admin/payments/stats?from_date=${today}&to_date=${today}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(stats.status).toBe(200);
-    expect(stats.body.total_payments).toBeDefined();
-  });
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(stats.status).toBe(200)
+    expect(stats.body.total_payments).toBeDefined()
+  })
 
   it('consulta e atualiza um usuario pelo painel', async () => {
-    const admin = await createAdmin();
-    const guest = await createUser({ email: 'guest-user-crud@example.test' });
+    const admin = await createAdmin()
+    const guest = await createUser({ email: 'guest-user-crud@example.test' })
 
     const detail = await request(app)
       .get(`/api/admin/users/${guest.user.id}`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(detail.status).toBe(200);
-    expect(detail.body.document_number).toBeUndefined();
+      .set('Authorization', `Bearer ${admin.token}`)
+    expect(detail.status).toBe(200)
+    expect(detail.body.document_number).toBeUndefined()
 
     const updated = await request(app)
       .put(`/api/admin/users/${guest.user.id}`)
@@ -421,15 +421,15 @@ describe('ADMIN — /api/admin', () => {
       .send({
         full_name: 'Guest Atualizado',
         phone: '00000000000',
-        password: 'novaSenha123',
-      });
-    expect(updated.status).toBe(200);
-    expect(updated.body.full_name).toBe('Guest Atualizado');
+        password: 'novaSenha123'
+      })
+    expect(updated.status).toBe(200)
+    expect(updated.body.full_name).toBe('Guest Atualizado')
 
     const emptyUpdate = await request(app)
       .put(`/api/admin/users/${guest.user.id}`)
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({});
-    expect(emptyUpdate.status).toBe(400);
-  });
-});
+      .send({})
+    expect(emptyUpdate.status).toBe(400)
+  })
+})

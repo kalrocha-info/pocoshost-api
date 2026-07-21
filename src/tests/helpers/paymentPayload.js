@@ -1,5 +1,5 @@
 /** Payload mínimo de cartão para testes (gateway mockado em mockAsaas.js). */
-export function creditCardPaymentPayload(reservationId, overrides = {}) {
+export function creditCardPaymentPayload (reservationId, overrides = {}) {
   return {
     reservation_id: reservationId,
     billing_type: 'CREDIT_CARD',
@@ -12,14 +12,14 @@ export function creditCardPaymentPayload(reservationId, overrides = {}) {
     billing_phone: '00000000000',
     billing_postal_code: '00000000',
     billing_address_number: '100',
-    ...overrides,
-  };
+    ...overrides
+  }
 }
 
-export function pixPaymentPayload(reservationId, overrides = {}) {
+export function pixPaymentPayload (reservationId, overrides = {}) {
   return {
     reservation_id: reservationId,
     billing_type: 'PIX',
-    ...overrides,
-  };
+    ...overrides
+  }
 }

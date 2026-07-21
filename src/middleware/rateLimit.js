@@ -1,6 +1,6 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit from 'express-rate-limit'
 
-const skipInTests = () => process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const skipInTests = () => process.env.NODE_ENV === 'test' || process.env.VITEST === 'true'
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -8,8 +8,8 @@ export const globalLimiter = rateLimit({
   skip: skipInTests,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Demasiadas requisições. Tente novamente em 15 minutos.' },
-});
+  message: { error: 'Demasiadas requisições. Tente novamente em 15 minutos.' }
+})
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -17,8 +17,8 @@ export const authLimiter = rateLimit({
   skip: skipInTests,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Demasiadas tentativas de autenticação. Tente novamente em 15 minutos.' },
-});
+  message: { error: 'Demasiadas tentativas de autenticação. Tente novamente em 15 minutos.' }
+})
 
 export const leadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -26,5 +26,5 @@ export const leadLimiter = rateLimit({
   skip: skipInTests,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Muitas solicitações. Aguarde alguns minutos antes de tentar novamente.' },
-});
+  message: { error: 'Muitas solicitações. Aguarde alguns minutos antes de tentar novamente.' }
+})

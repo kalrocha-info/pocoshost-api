@@ -14,14 +14,9 @@
  */
 
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Inicializar variáveis de ambiente se houver arquivo .env
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Cores ANSI para formatação elegante no terminal
 const colors = {
