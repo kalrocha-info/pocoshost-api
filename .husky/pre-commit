@@ -1,1 +1,1 @@
-npx lint-staged
+PATH="/usr/bin:$PATH" npx lint-staged
