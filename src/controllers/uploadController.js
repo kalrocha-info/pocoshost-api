@@ -1,12 +1,5 @@
-import { v2 as cloudinary } from 'cloudinary'
+import cloudinary from '../services/cloudinaryClient.js'
 import streamifier from 'streamifier'
-
-// Configuração do Cloudinary usando variáveis de ambiente
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-})
 
 /**
  * Faz upload do buffer do arquivo (req.file.buffer) direto para o Cloudinary
