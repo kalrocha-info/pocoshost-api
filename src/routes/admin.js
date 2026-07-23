@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authRequired, adminRequired } from '../middleware/auth.js'
+import { cacheHeaders } from '../middleware/cacheHeaders.js'
 import {
   getStats,
   listHosts,
@@ -46,7 +47,7 @@ router.use(authRequired, adminRequired)
 // ============================================
 // Dashboard
 // ============================================
-router.get('/stats', getStats)
+router.get('/stats', cacheHeaders('stable', 300), getStats)
 
 // ============================================
 // CRM leve
