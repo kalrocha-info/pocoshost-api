@@ -1,0 +1,38 @@
+name: Automated Hostinger Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test-and-deploy:
+    name: Test and Trigger Hostinger SSH Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Execute Remote SSH Deploy on Hostinger
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: '147.93.38.153'
+          port: 65002
+          username: 'u208064935'
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script_stop: true
+          script: |
+            ~/pocoshost_deploy/scripts/deploy.sh
