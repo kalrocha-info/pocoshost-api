@@ -176,8 +176,13 @@ Estrutura mínima do registro:
 | POST | /api/admin/... | ... |
 
 ## Resultado dos testes
-- npx vitest run: X/X passed (100%)
-- npx eslint "src/**/*.js": 0 erros
+- npm test: X/X passed (100%)
+- npm run lint: 0 erros
+
+## Sincronização
+- [ ] git push origin master (confirmado: hash do commit)
+- [ ] GitHub Actions: workflow passou (link)
+- [ ] Hostinger: endpoints /api/health/live e /api/health/ready retornam 200
 
 ## Notas
 ...
@@ -185,13 +190,59 @@ Estrutura mínima do registro:
 
 ---
 
-## 🚀 Deploy
+## 🚀 Sincronização Obrigatória — Triângulo Local → GitHub → Hostinger
 
-- **Branch**: `master`
-- **Deploy automático**: GitHub Actions → SSH Hostinger
-- **Quality Gates no servidor**: se testes ou ESLint falharem durante deploy, o processo para automaticamente
-- **Staging**: **ABANDONADO** (ver [`DECISAO_03_ABANDONO_ETAPA_STAGING.md`](../reorientacao_pocoshost/DECISAO_03_ABANDONO_ETAPA_STAGING.md))
-- **Reinício do Passenger**: `touch tmp/restart.txt` no App Root da Hostinger
+> **REGRA P0:** Nenhuma microetapa é considerada concluída enquanto os três ambientes não estiverem sincronizados e verificados.
+
+### Os Três Ambientes
+
+| Ambiente | O quê | Como verificar |
+|---|---|---|
+| **Local** | Código fonte, testes e lint | `npm test` (100%) + `npm run lint` (0 erros) |
+| **GitHub** | Repositório remoto (`master`) | `git push origin master` + Actions passando |
+| **Hostinger** | Aplicação em produção | `curl https://api.pocoshost.com/api/health/live` retorna `200` |
+
+### Fluxo de Entrega Obrigatório
+
+```
+[1] LOCAL — Desenvolver + Testar
+        ↓
+    npm test          ← 100% obrigatório
+    npm run lint      ← 0 erros obrigatório
+        ↓
+[2] GITHUB — Versionar
+        ↓
+    git add -A
+    git commit -m "..."
+    git push origin master
+        ↓
+    GitHub Actions: workflow deve passar ✅
+        ↓
+[3] HOSTINGER — Validar em Produção
+        ↓
+    (deploy automático via SSH pelo Actions)
+    curl https://api.pocoshost.com/api/health/live  → 200 ✅
+    curl https://api.pocoshost.com/api/health/ready → 200 ✅
+```
+
+### Regras de Sincronização
+
+1. **Nunca deixar o local à frente do GitHub** — commit e push são parte do mesmo passo de entrega.
+2. **Nunca deixar o GitHub à frente da Hostinger sem verificação** — após o push, confirmar que o deploy correu e os endpoints de saúde respondem.
+3. **Hotfix de emergência**: mesmo em correções urgentes, a ordem Local → GitHub → Hostinger deve ser respeitada. Nunca editar arquivos diretamente no servidor.
+4. **Falha no deploy**: se o GitHub Actions falhar ou o Hostinger não responder, **não fechar a tarefa** — investigar, corrigir e reverificar.
+
+### Informações de Infraestrutura
+
+| Campo | Valor |
+|---|---|
+| **Servidor** | Hostinger Business (u208064935@147.93.38.153:65002) |
+| **Runtime** | Node.js 24 via NVM + Phusion Passenger (LiteSpeed) |
+| **API App Root** | `/home/u208064935/domains/api.pocoshost.com/nodejs` |
+| **App App Root** | `/home/u208064935/domains/pocoshost.com/nodejs` |
+| **Reinício Passenger** | `touch tmp/restart.txt` no App Root |
+| **Staging** | **ABANDONADO** — ver [`DECISAO_03`](../reorientacao_pocoshost/DECISAO_03_ABANDONO_ETAPA_STAGING.md) |
+| **SSH alias** | `hostinger-pocoshost` (em `~/.ssh/config`) |
 
 ---
 
