@@ -37,6 +37,15 @@ import {
   updateMaintenanceOrder,
   createMaintenanceOrderPhoto
 } from '../controllers/maintenanceController.js'
+import {
+  listContracts,
+  getContract,
+  createContract,
+  updateContract,
+  listStatements,
+  createStatement,
+  updateStatement
+} from '../controllers/contractsController.js'
 import { validate, schemas } from '../middleware/validate.js'
 
 const router = Router()
@@ -117,5 +126,20 @@ router.get('/users/:id', getUser)
 router.post('/users', createUser)
 router.put('/users/:id', updateUser)
 router.delete('/users/:id', deleteUser)
+
+// ============================================
+// Contracts (Contratos de Gestão)
+// ============================================
+router.get('/contracts', listContracts)
+router.get('/contracts/:id', getContract)
+router.post('/contracts', validate(schemas.contractCreate), createContract)
+router.patch('/contracts/:id', validate(schemas.contractUpdate), updateContract)
+
+// ============================================
+// Contract Statements (Balancetes Mensais)
+// ============================================
+router.get('/contracts/:id/statements', listStatements)
+router.post('/contracts/:id/statements', validate(schemas.contractStatement), createStatement)
+router.patch('/contracts/:id/statements/:statementId', validate(schemas.contractStatementUpdate), updateStatement)
 
 export default router

@@ -36,6 +36,8 @@ beforeAll(async () => {
 afterEach(async () => {
   await testPool.query(`
     TRUNCATE TABLE
+      contract_statements,
+      management_contracts,
       maintenance_order_photos,
       maintenance_orders,
       service_providers,

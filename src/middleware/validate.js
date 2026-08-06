@@ -267,5 +267,46 @@ export const schemas = {
   }).refine(data => Boolean(data.email || data.phone), {
     message: 'Informe pelo menos e-mail ou telefone.',
     path: ['phone']
+  }),
+
+  contractCreate: z.object({
+    property_id: z.string().uuid('property_id deve ser um UUID válido').optional().nullable(),
+    host_user_id: z.string().uuid('host_user_id deve ser um UUID válido').optional().nullable(),
+    contract_number: z.string().trim().max(50).optional().nullable(),
+    management_fee_pct: z.coerce.number().min(0).max(100).optional().default(20),
+    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start_date deve ser YYYY-MM-DD'),
+    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end_date deve ser YYYY-MM-DD').optional().nullable(),
+    notes: z.string().trim().max(3000).optional().nullable()
+  }),
+
+  contractUpdate: z.object({
+    status: z.enum(['draft', 'active', 'suspended', 'terminated']).optional(),
+    management_fee_pct: z.coerce.number().min(0).max(100).optional(),
+    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end_date deve ser YYYY-MM-DD').optional().nullable(),
+    notes: z.string().trim().max(3000).optional().nullable(),
+    contract_number: z.string().trim().max(50).optional().nullable()
+  }).refine(data => Object.keys(data).length > 0, {
+    message: 'Nenhum campo para atualizar.'
+  }),
+
+  contractStatement: z.object({
+    reference_month: z.string().regex(/^\d{4}-\d{2}$/, 'reference_month deve ser YYYY-MM'),
+    gross_revenue: z.coerce.number().nonnegative('gross_revenue deve ser >= 0'),
+    management_fee: z.coerce.number().nonnegative().optional().default(0),
+    operational_expenses: z.coerce.number().nonnegative().optional().default(0),
+    status: z.enum(['draft', 'issued', 'paid']).optional().default('draft'),
+    notes: z.string().trim().max(3000).optional().nullable()
+  }),
+
+  contractStatementUpdate: z.object({
+    gross_revenue: z.coerce.number().nonnegative().optional(),
+    management_fee: z.coerce.number().nonnegative().optional(),
+    operational_expenses: z.coerce.number().nonnegative().optional(),
+    status: z.enum(['draft', 'issued', 'paid']).optional(),
+    notes: z.string().trim().max(3000).optional().nullable(),
+    issued_at: z.string().datetime({ offset: true }).optional().nullable(),
+    paid_at: z.string().datetime({ offset: true }).optional().nullable()
+  }).refine(data => Object.keys(data).length > 0, {
+    message: 'Nenhum campo para atualizar.'
   })
 }
