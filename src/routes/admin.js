@@ -46,6 +46,13 @@ import {
   createStatement,
   updateStatement
 } from '../controllers/contractsController.js'
+import {
+  listExpenses,
+  getExpense,
+  createExpense,
+  updateExpense,
+  deleteExpense
+} from '../controllers/contractExpensesController.js'
 import { validate, schemas } from '../middleware/validate.js'
 
 const router = Router()
@@ -141,5 +148,14 @@ router.patch('/contracts/:id', validate(schemas.contractUpdate), updateContract)
 router.get('/contracts/:id/statements', listStatements)
 router.post('/contracts/:id/statements', validate(schemas.contractStatement), createStatement)
 router.patch('/contracts/:id/statements/:statementId', validate(schemas.contractStatementUpdate), updateStatement)
+
+// ============================================
+// Contract Expenses (Despesas Operacionais)
+// ============================================
+router.get('/contracts/:id/expenses', listExpenses)
+router.get('/contracts/:id/expenses/:expenseId', getExpense)
+router.post('/contracts/:id/expenses', validate(schemas.contractExpenseCreate), createExpense)
+router.patch('/contracts/:id/expenses/:expenseId', validate(schemas.contractExpenseUpdate), updateExpense)
+router.delete('/contracts/:id/expenses/:expenseId', deleteExpense)
 
 export default router

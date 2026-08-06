@@ -308,5 +308,25 @@ export const schemas = {
     paid_at: z.string().datetime({ offset: true }).optional().nullable()
   }).refine(data => Object.keys(data).length > 0, {
     message: 'Nenhum campo para atualizar.'
+  }),
+
+  contractExpenseCreate: z.object({
+    category: z.enum(['cleaning', 'maintenance', 'ota_fee', 'tax', 'supply', 'other']).optional().default('maintenance'),
+    description: z.string().trim().min(3, 'Descrição deve ter pelo menos 3 caracteres').max(255),
+    amount: z.coerce.number().positive('Preço/valor deve ser maior que 0'),
+    expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expense_date deve ser YYYY-MM-DD').optional(),
+    statement_id: z.string().uuid('statement_id deve ser um UUID válido').optional().nullable(),
+    receipt_url: z.string().trim().url('receipt_url deve ser uma URL válida').max(2000).optional().nullable()
+  }),
+
+  contractExpenseUpdate: z.object({
+    category: z.enum(['cleaning', 'maintenance', 'ota_fee', 'tax', 'supply', 'other']).optional(),
+    description: z.string().trim().min(3).max(255).optional(),
+    amount: z.coerce.number().positive().optional(),
+    expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expense_date deve ser YYYY-MM-DD').optional(),
+    statement_id: z.string().uuid('statement_id deve ser um UUID válido').optional().nullable(),
+    receipt_url: z.string().trim().url().max(2000).optional().nullable()
+  }).refine(data => Object.keys(data).length > 0, {
+    message: 'Nenhum campo para atualizar.'
   })
 }
