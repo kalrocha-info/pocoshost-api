@@ -28,7 +28,7 @@ function createPoolConfig () {
 }
 
 const POOL_SINGLETON_KEY = 'pocoshost_pg_pool'
-export const pool = globalThis[POOL_SINGLETON_KEY] ??= new pg.Pool(createPoolConfig())
+export const pool = globalThis[POOL_SINGLETON_KEY] ??= new Pool(createPoolConfig())
 
 if (!globalThis.__pocoshost_pg_pool_error_handler_registered) {
   globalThis[POOL_SINGLETON_KEY].on('error', (err) => {
